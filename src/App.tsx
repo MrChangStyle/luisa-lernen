@@ -1,17 +1,29 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { SAMPLE_LESSON } from './data/sampleLesson'
+import { requestLesson, shrinkPhoto, type LessonAsk } from './logic/api'
 import type { CheckResult } from './logic/check'
 import { addEgg } from './logic/farm'
 import { dayKey, moodText } from './logic/mood'
 import { Family, PinGate } from './screens/Family'
 import { FarmScreen } from './screens/Farm'
 import { Home } from './screens/Home'
-import { Camera, Confirm, Done, StepScreen } from './screens/Learn'
+import { Camera, Confirm, Done, Problem, StepScreen, Waiting } from './screens/Learn'
+import { SUBJECTS } from './data/subjects'
 import { OpenScreen, PhotosScreen, PracticeMenu, SelectionScreen, SubjectScreen } from './screens/Practice'
-import { clock, useSaved, withEvent, type Attempt } from './state'
+import { clock, useSaved, withEvent, withLesson, type Attempt } from './state'
 import { VERSION_LABEL, type Lesson } from './types'
 
-const LESSONS: Record<string, Lesson> = { [SAMPLE_LESSON.id]: SAMPLE_LESSON }
+const subjectOf = (topic: string) => Object.keys(SUBJECTS).find((k) => SUBJECTS[k].some((t) => t.name === topic)) ?? 'Mathe'
+
+// Ein Auftrag an die KI: was sie erstellen soll und wohin es danach geht
+interface Job {
+  ask: LessonAsk | { mode: 'photo-file'; file: File }
+  how: string
+  waitText: string
+  back: ScreenName
+  confirm: boolean
+  practiceKey?: string
+}
 
 type ScreenName =
   | 'home'
@@ -19,6 +31,8 @@ type ScreenName =
   | 'confirm'
   | 'step'
   | 'done'
+  | 'waiting'
+  | 'problem'
   | 'practice'
   | 'subject'
   | 'selection'
@@ -39,8 +53,14 @@ export default function App() {
   const [version, setVersion] = useState(0)
   const [result, setResult] = useState<CheckResult | null>(null)
   const [reward, setReward] = useState<string[]>([])
+  const [lessonId, setLessonId] = useState<string>(SAMPLE_LESSON.id)
+  const [job, setJob] = useState<Job | null>(null)
+  const [problem, setProblem] = useState<{ text: string; retry: 'again' | 'photo' } | null>(null)
+  const [practiceKey, setPracticeKey] = useState<string | null>(null)
+  const abort = useRef<AbortController | null>(null)
 
-  const lesson = SAMPLE_LESSON
+  const lessons: Record<string, Lesson> = { [SAMPLE_LESSON.id]: SAMPLE_LESSON, ...saved.lessons }
+  const lesson = lessons[lessonId] ?? SAMPLE_LESSON
   const today = dayKey(new Date())
   const todayMood = saved.mood[today]
 
@@ -57,7 +77,47 @@ export default function App() {
   const updateStat = (fn: (st: Attempt['stats'][number]) => Attempt['stats'][number]) =>
     updateAttempt((a) => ({ ...a, stats: a.stats.map((st, i) => (i === stepIndex ? fn(st) : st)) }))
 
-  const startLesson = (l: Lesson, how: string) => {
+  // Lässt die KI einen Lernpfad erstellen. Bei einem Foto kommt danach die Frage „Ist das die richtige Aufgabe?“.
+  const run = async (j: Job) => {
+    abort.current?.abort()
+    const ctrl = new AbortController()
+    abort.current = ctrl
+    setJob(j)
+    setScreen('waiting')
+    try {
+      const ask: LessonAsk = j.ask.mode === 'photo-file' ? { mode: 'photo', image: await shrinkPhoto(j.ask.file), mediaType: 'image/jpeg' } : j.ask
+      const answer = await requestLesson(ask, ctrl.signal)
+      if (ctrl.signal.aborted) return
+      if ('lesson' in answer) {
+        const l = answer.lesson
+        setSaved((s) => withLesson(s, l))
+        setLessonId(l.id)
+        setPracticeKey(j.practiceKey ?? null)
+        if (j.confirm) setScreen('confirm')
+        else startLesson(l, j.how)
+      } else if ('problem' in answer) {
+        setProblem({ text: answer.problem, retry: 'photo' })
+        setScreen('problem')
+      } else {
+        setProblem({ text: answer.error, retry: 'again' })
+        setScreen('problem')
+      }
+    } catch {
+      if (ctrl.signal.aborted) return
+      setProblem({ text: 'Das Foto konnte nicht geöffnet werden. Mache bitte ein neues Foto.', retry: 'photo' })
+      setScreen('problem')
+    }
+  }
+
+  const cancel = () => {
+    abort.current?.abort()
+    setScreen(job?.back ?? 'home')
+  }
+
+  const startTopic = (subj: string, topic: string, back: ScreenName, how: string) =>
+    run({ ask: { mode: 'topic', subject: subj, topic }, how, waitText: `Ich denke mir eine Aufgabe zu „${topic}“ aus.`, back, confirm: false })
+
+  const startLesson = (l: Lesson, how: string, photo = false) => {
     const id = crypto.randomUUID()
     const attempt: Attempt = {
       id,
@@ -68,6 +128,7 @@ export default function App() {
       startedAt: new Date().toISOString(),
       finishedAt: null,
       stats: l.steps.map(() => ({ again: 0, wrong: [], helped: null })),
+      photo,
     }
     setSaved((s) => withEvent({ ...s, attempts: [...s.attempts, attempt].slice(-100) }, `${how}: ${l.subject}, ${l.topic}`))
     setAttemptId(id)
@@ -97,6 +158,11 @@ export default function App() {
     setSaved((s) => withEvent(s, `Schritt ${stepIndex + 1}: „Erklär es mir nochmal“ → ${VERSION_LABEL[lesson.steps[stepIndex].versions[next].key]}`))
   }
 
+  const onStop = () => {
+    setSaved((s) => withEvent(s, `Aufgabe bei Schritt ${stepIndex + 1} beendet`))
+    setScreen('home')
+  }
+
   const onNext = () => {
     if (stepIndex < lesson.steps.length - 1) {
       setStepIndex(stepIndex + 1)
@@ -107,11 +173,26 @@ export default function App() {
     const { farm, messages } = addEgg(saved.farm)
     setReward(messages)
     updateAttempt((a) => ({ ...a, finishedAt: new Date().toISOString() }))
-    setSaved((s) => withEvent({ ...s, farm }, `Aufgabe fertig, 1 Ei bekommen${messages.length ? '. ' + messages.join(' ') : ''}`))
+    const done = practiceKey
+    setSaved((s) =>
+      withEvent(
+        { ...s, farm, donePractice: done && !s.donePractice.includes(done) ? [...s.donePractice, done] : s.donePractice },
+        `Aufgabe fertig, 1 Ei bekommen${messages.length ? '. ' + messages.join(' ') : ''}`,
+      ),
+    )
+    setPracticeKey(null)
     setScreen('done')
   }
 
-  const finishedLessons = [...new Set(saved.attempts.filter((a) => a.finishedAt).map((a) => a.lessonId))].map((id) => LESSONS[id]).filter(Boolean)
+  // Offene Übungen: die zwei neuen Aufgaben jedes fertigen Lernpfads, die Luisa noch nicht gemacht hat
+  const finishedLessons = [...new Set(saved.attempts.filter((a) => a.finishedAt).map((a) => a.lessonId))]
+    .map((id) => lessons[id])
+    .filter(Boolean)
+    .map((l) => ({ ...l, practice: l.practice.filter((p) => !saved.donePractice.includes(`${l.id}#${p.text}`)) }))
+    .filter((l) => l.practice.length > 0)
+  // Ältere Einträge ohne Merkmal stammen aus der Testversion, in der jede Aufgabe ein Foto war
+  const photoAttempts = saved.attempts.filter((a) => a.photo ?? a.lessonId === SAMPLE_LESSON.id)
+  const practiced = new Set(saved.attempts.filter((a) => a.finishedAt).map((a) => a.topic))
 
   switch (screen) {
     case 'home':
@@ -130,11 +211,27 @@ export default function App() {
         />
       )
     case 'camera':
-      return <Camera onPhoto={() => setScreen('confirm')} onBack={() => setScreen('home')} />
+      return (
+        <Camera
+          onPhoto={(file) => run({ ask: { mode: 'photo-file', file }, how: 'Foto gemacht und bestätigt', waitText: 'Ich lese deine Aufgabe.', back: 'camera', confirm: true })}
+          onBack={() => setScreen('home')}
+        />
+      )
+    case 'waiting':
+      return <Waiting key={job?.waitText} text={job?.waitText ?? ''} onCancel={cancel} />
+    case 'problem':
+      return (
+        <Problem
+          text={problem?.text ?? ''}
+          retry={problem?.retry === 'photo' ? 'Neues Foto machen' : 'Nochmal versuchen'}
+          onRetry={() => (problem?.retry === 'photo' ? setScreen('camera') : job && run(job))}
+          onBack={() => setScreen(job?.back === 'camera' ? 'home' : (job?.back ?? 'home'))}
+        />
+      )
     case 'confirm':
-      return <Confirm lesson={lesson} onYes={() => startLesson(lesson, 'Foto gemacht und bestätigt')} onNo={() => setScreen('camera')} />
+      return <Confirm lesson={lesson} onYes={() => startLesson(lesson, job?.how ?? 'Foto gemacht und bestätigt', true)} onNo={() => setScreen('camera')} />
     case 'step':
-      return <StepScreen lesson={lesson} index={stepIndex} version={version} result={result} onAgain={onAgain} onResult={onResult} onNext={onNext} />
+      return <StepScreen lesson={lesson} index={stepIndex} version={version} result={result} onAgain={onAgain} onResult={onResult} onNext={onNext} onStop={onStop} />
     case 'done':
       return <Done lesson={lesson} farm={saved.farm} rewardMessages={reward} onFarm={() => setScreen('farm')} onHome={() => setScreen('home')} />
     case 'practice':
@@ -142,7 +239,7 @@ export default function App() {
         <PracticeMenu
           selection={saved.selection}
           openCount={finishedLessons.reduce((n, l) => n + l.practice.length, 0)}
-          photoCount={saved.attempts.length}
+          photoCount={photoAttempts.length}
           onSubject={(s) => {
             setSubject(s)
             setScreen('subject')
@@ -155,6 +252,8 @@ export default function App() {
         <SubjectScreen
           subject={subject}
           selection={saved.selection}
+          practiced={practiced}
+          onStart={(t) => startTopic(subject, t, 'subject', `Übung gestartet (${subject})`)}
           onSubject={setSubject}
           onToggle={(t) =>
             setSaved((s) =>
@@ -168,20 +267,35 @@ export default function App() {
       return (
         <SelectionScreen
           selection={saved.selection}
-          onStart={(t) => startLesson(lesson, `Übung aus „Meine Auswahl“ gestartet (${t})`)}
+          onStart={(t) => startTopic(subjectOf(t), t, 'selection', 'Übung aus „Meine Auswahl“ gestartet')}
           onChange={(next) => setSaved((s) => ({ ...s, selection: next }))}
           onBack={() => setScreen('practice')}
         />
       )
     case 'open':
-      return <OpenScreen lessons={finishedLessons} onBack={() => setScreen('practice')} />
+      return (
+        <OpenScreen
+          lessons={finishedLessons}
+          onStart={(l, text) =>
+            run({
+              ask: { mode: 'task', subject: l.subject, topic: l.topic, text },
+              how: 'Offene Übung gestartet',
+              waitText: 'Ich bereite deine Übung vor.',
+              back: 'open',
+              confirm: false,
+              practiceKey: `${l.id}#${text}`,
+            })
+          }
+          onBack={() => setScreen('practice')}
+        />
+      )
     case 'photos':
-      return <PhotosScreen attempts={saved.attempts} onBack={() => setScreen('practice')} />
+      return <PhotosScreen attempts={photoAttempts} onBack={() => setScreen('practice')} />
     case 'farm':
       return <FarmScreen farm={saved.farm} onBack={() => setScreen('home')} />
     case 'pin':
       return <PinGate pin={saved.parentPin} onSetPin={(p) => setSaved((s) => ({ ...s, parentPin: p }))} onOk={() => setScreen('family')} onBack={() => setScreen('home')} />
     case 'family':
-      return <Family saved={saved} lessons={LESSONS} onBack={() => setScreen('home')} />
+      return <Family saved={saved} lessons={lessons} onBack={() => setScreen('home')} />
   }
 }

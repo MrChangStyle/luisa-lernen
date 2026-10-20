@@ -1,5 +1,5 @@
 // Ein Lernpfad ist genau das Datenpaket aus dem Konzept: Schritte mit je drei Fassungen.
-// Später liefert ihn der Server (KI + Wächter); in dieser Testversion kommt er aus src/data.
+// Der Server (api/lesson.ts) erstellt ihn mit der KI aus Luisas Foto oder einem Thema.
 
 export type VersionKey = 'worte' | 'bild' | 'regel'
 
@@ -20,6 +20,7 @@ export interface Version {
 
 export type Check =
   | { type: 'choice'; question: string; options: string[]; answer: string; hint: string }
+  | { type: 'value'; question: string; answers: string[]; okText: string; hint: string }
   | { type: 'number'; question: string; answer: number; okText: string; largerMultipleHint: string; hint: string }
   | {
       type: 'numerators'
@@ -58,6 +59,8 @@ export interface Lesson {
   parentSolution: string
   steps: Step[]
   practice: { text: string; note: string }[]
+  // Fachwörter, die in diesem Lernpfad mit [[…]] markiert sind
+  glossary?: Record<string, string>
 }
 
 export interface Topic {

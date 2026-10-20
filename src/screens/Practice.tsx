@@ -6,8 +6,6 @@ import { SUBJECTS } from '../data/subjects'
 import type { Lesson } from '../types'
 import type { Attempt } from '../state'
 
-const LESSON_TOPICS = new Set(['Brüche addieren'])
-
 interface MenuProps {
   selection: string[]
   openCount: number
@@ -48,13 +46,23 @@ export function PracticeMenu({ selection, openCount, photoCount, onSubject, go }
       </div>
       <p className="q">Oder:</p>
       {item('selection', 'Meine Auswahl', 'Themen, die du selbst ausgesucht hast', selection.length)}
-      {item('open', 'Offene Übungen', 'Die zwei neuen Aufgaben zu deinen Fotos', openCount)}
+      {item('open', 'Offene Übungen', 'Neue Aufgaben zu dem, was du fertig gemacht hast', openCount)}
       {item('photos', 'Aus meinen Fotos', 'Alle Themen, die du schon fotografiert hast', photoCount)}
     </Screen>
   )
 }
 
-export function SubjectScreen({ subject, selection, onToggle, onSubject, onBack }: { subject: string; selection: string[]; onToggle: (t: string) => void; onSubject: (s: string) => void; onBack: () => void }) {
+interface SubjectProps {
+  subject: string
+  selection: string[]
+  practiced: Set<string>
+  onStart: (topic: string) => void
+  onToggle: (t: string) => void
+  onSubject: (s: string) => void
+  onBack: () => void
+}
+
+export function SubjectScreen({ subject, selection, practiced, onStart, onToggle, onSubject, onBack }: SubjectProps) {
   return (
     <Screen
       foot={
@@ -71,17 +79,22 @@ export function SubjectScreen({ subject, selection, onToggle, onSubject, onBack 
           </button>
         ))}
       </div>
-      <p className="mini">Tippe auf ein Thema, um es in „Meine Auswahl“ zu legen.</p>
+      <p className="mini">Tippe auf ein Thema, dann startet eine Übung. Mit dem Knopf rechts legst du das Thema in „Meine Auswahl“.</p>
       {SUBJECTS[subject].map((t) => {
         const on = selection.includes(t.name)
+        const done = practiced.has(t.name)
         return (
-          <button key={t.name} className={`card tap row-between${on ? ' picked' : ''}`} aria-pressed={on} onClick={() => onToggle(t.name)}>
-            <span>
-              {on ? '✓ ' : ''}
-              {t.name}
-            </span>
-            <span className={`pill ${t.status === 'geübt' ? 'ok' : 'idle'}`}>{t.status}</span>
-          </button>
+          <div key={t.name} className="topic-row">
+            <button className="card tap" onClick={() => onStart(t.name)}>
+              <b>{t.name}</b>
+              <span>
+                <span className={`pill ${done ? 'ok' : 'idle'}`}>{done ? 'geübt' : 'neu'}</span>
+              </span>
+            </button>
+            <button className="pick-btn" aria-pressed={on} aria-label={on ? `${t.name} aus Meine Auswahl nehmen` : `${t.name} in Meine Auswahl legen`} onClick={() => onToggle(t.name)}>
+              {on ? '✓ Auswahl' : '+ Auswahl'}
+            </button>
+          </div>
         )
       })}
     </Screen>
@@ -96,10 +109,7 @@ interface SelectionProps {
 }
 
 export function SelectionScreen({ selection, onStart, onChange, onBack }: SelectionProps) {
-  const [chosen, setChosen] = useState<string | null>(null)
   const [removed, setRemoved] = useState<{ topic: string; index: number } | null>(null)
-  const current = chosen && selection.includes(chosen) ? chosen : (selection[0] ?? null)
-  const ready = current !== null && LESSON_TOPICS.has(current)
 
   const remove = (i: number) => {
     setRemoved({ topic: selection[i], index: i })
@@ -116,34 +126,23 @@ export function SelectionScreen({ selection, onStart, onChange, onBack }: Select
   return (
     <Screen
       foot={
-        <>
-          {current && (
-            <button className="btn" disabled={!ready} onClick={() => current && onStart(current)}>
-              {ready ? `Mit „${current}“ anfangen` : `„${current}“ kommt mit der KI`}
-            </button>
-          )}
-          <button className="btn sec" onClick={onBack}>
-            Zurück
-          </button>
-        </>
+        <button className="btn sec" onClick={onBack}>
+          Zurück
+        </button>
       }
     >
       <div className="s-title">Meine Auswahl</div>
       {selection.length === 0 ? (
         <p className="mini">Du hast noch nichts ausgewählt. Tippe bei einem Fach auf ein Thema.</p>
       ) : (
-        <p className="mini">Tippe auf ein Thema, um damit anzufangen. Mit den Pfeilen änderst du die Reihenfolge. Mit ✕ nimmst du ein Thema heraus.</p>
+        <p className="mini">Tippe auf ein Thema, dann startet eine Übung. Mit den Pfeilen änderst du die Reihenfolge. Mit ✕ nimmst du ein Thema heraus.</p>
       )}
       <ol className="sel-list">
         {selection.map((t, i) => (
-          <li key={t} className={`card sel-row${t === current ? ' picked' : ''}`}>
-            <button className="sel-name" aria-pressed={t === current} onClick={() => setChosen(t)}>
+          <li key={t} className="card sel-row">
+            <button className="sel-name" onClick={() => onStart(t)}>
               <span className="sel-num">{i + 1}.</span>
-              <span>
-                {t}
-                <br />
-                <span className={`pill ${LESSON_TOPICS.has(t) ? 'ok' : 'idle'}`}>{LESSON_TOPICS.has(t) ? 'bereit' : 'kommt mit der KI'}</span>
-              </span>
+              <span>{t}</span>
             </button>
             <span className="sel-tools">
               <button className="icon-btn" aria-label={`${t} nach oben`} disabled={i === 0} onClick={() => onChange(move(selection, i, -1))}>
@@ -167,12 +166,11 @@ export function SelectionScreen({ selection, onStart, onChange, onBack }: Select
           </button>
         </div>
       )}
-      <p className="mini">In der Testversion gibt es eine fertige Übung: „Brüche addieren“. Die anderen Themen erstellt später die KI.</p>
     </Screen>
   )
 }
 
-export function OpenScreen({ lessons, onBack }: { lessons: Lesson[]; onBack: () => void }) {
+export function OpenScreen({ lessons, onStart, onBack }: { lessons: Lesson[]; onStart: (l: Lesson, text: string) => void; onBack: () => void }) {
   return (
     <Screen
       foot={
@@ -183,18 +181,20 @@ export function OpenScreen({ lessons, onBack }: { lessons: Lesson[]; onBack: () 
     >
       <div className="s-title">Offene Übungen</div>
       {lessons.length === 0 && (
-        <p className="mini">Im Moment gibt es keine offenen Übungen. Wenn du eine Aufgabe fotografiert und fertig gemacht hast, stehen hier zwei neue Aufgaben dazu.</p>
+        <p className="mini">Im Moment gibt es keine offenen Übungen. Wenn du eine Aufgabe fertig gemacht hast, stehen hier zwei neue Aufgaben dazu.</p>
       )}
+      {lessons.length > 0 && <p className="mini">Tippe auf eine Übung, dann startet sie.</p>}
       {lessons.flatMap((l) =>
         l.practice.map((p, i) => (
-          <div key={`${l.id}-${i}`} className="card">
+          <button key={`${l.id}-${i}`} className="card tap" onClick={() => onStart(l, p.text)}>
             <b>
-              {l.topic} · Übung {i + 1}:
-            </b>{' '}
-            <Inline text={p.text} />
-            <br />
+              {l.topic} · Übung {i + 1}
+            </b>
+            <span>
+              <Inline text={p.text} />
+            </span>
             <span className="mini">{p.note}</span>
-          </div>
+          </button>
         )),
       )}
     </Screen>
