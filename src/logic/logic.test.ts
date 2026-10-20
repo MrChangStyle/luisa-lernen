@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { addEgg, EMPTY_FARM } from './farm'
 import { checkAnswer } from './check'
 import { SAMPLE_LESSON } from '../data/sampleLesson'
+import { archiveAttempts, restoreAttempt, type Saved } from '../state'
 
 describe('Bauernhof', () => {
   it('gibt ein Ei', () => {
@@ -51,5 +52,38 @@ describe('Meine Auswahl', () => {
   it('bleibt am Rand unverändert', () => {
     expect(move(['a', 'b'], 0, -1)).toEqual(['a', 'b'])
     expect(move(['a', 'b'], 1, 1)).toEqual(['a', 'b'])
+  })
+})
+
+describe('Aufgaben zurücksetzen', () => {
+  const attempt = (id: string, lessonId: string) => ({ id, lessonId, subject: 'Mathe', topic: `Thema ${id}`, source: 'Übung', startedAt: '2026-10-20T10:00:00Z', finishedAt: '2026-10-20T10:05:00Z', stats: [] })
+  const base: Saved = {
+    farm: { egg: 3, chick: 1, hen: 0, rooster: 0, cow: 0 },
+    mood: {},
+    selection: [],
+    attempts: [attempt('a1', 'L1'), attempt('a2', 'L2')],
+    events: [],
+    parentPin: null,
+    lessons: { L1: SAMPLE_LESSON, L2: SAMPLE_LESSON },
+    donePractice: ['L1#x'],
+  }
+  const last = (s: Saved) => s.events[s.events.length - 1]?.text
+  it('legt eine Aufgabe ins Archiv und löscht nichts', () => {
+    const s = archiveAttempts(base, ['a1'], '2026-10-21T08:00:00Z')
+    expect(s.attempts).toHaveLength(2)
+    expect(s.attempts[0].archivedAt).toBe('2026-10-21T08:00:00Z')
+    expect(s.attempts[1].archivedAt).toBeUndefined()
+    expect(s.lessons).toEqual(base.lessons)
+    expect(s.donePractice).toEqual(base.donePractice)
+    expect(s.farm).toEqual(base.farm)
+    expect(last(s)).toBe('Familienbereich: „Thema a1“ zurückgesetzt und archiviert')
+  })
+  it('setzt alle zurück und holt eine wieder zurück', () => {
+    const all = archiveAttempts(base, ['a1', 'a2'])
+    expect(all.attempts.every((a) => a.archivedAt)).toBe(true)
+    expect(last(all)).toBe('Familienbereich: 2 Aufgaben zurückgesetzt und archiviert')
+    const back = restoreAttempt(all, 'a2')
+    expect(back.attempts[1].archivedAt).toBeNull()
+    expect(last(back)).toBe('Familienbereich: „Thema a2“ aus dem Archiv zurückgeholt')
   })
 })

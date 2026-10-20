@@ -10,7 +10,7 @@ import { Home } from './screens/Home'
 import { Camera, Confirm, Done, Problem, StepScreen, Waiting } from './screens/Learn'
 import { SUBJECTS } from './data/subjects'
 import { OpenScreen, PhotosScreen, PracticeMenu, SelectionScreen, SubjectScreen } from './screens/Practice'
-import { clock, useSaved, withEvent, withLesson, type Attempt } from './state'
+import { archiveAttempts, clock, restoreAttempt, useSaved, withEvent, withLesson, type Attempt } from './state'
 import { VERSION_LABEL, type Lesson } from './types'
 
 const subjectOf = (topic: string) => Object.keys(SUBJECTS).find((k) => SUBJECTS[k].some((t) => t.name === topic)) ?? 'Mathe'
@@ -130,7 +130,7 @@ export default function App() {
       stats: l.steps.map(() => ({ again: 0, wrong: [], helped: null })),
       photo,
     }
-    setSaved((s) => withEvent({ ...s, attempts: [...s.attempts, attempt].slice(-100) }, `${how}: ${l.subject}, ${l.topic}`))
+    setSaved((s) => withEvent({ ...s, attempts: [...s.attempts, attempt] }, `${how}: ${l.subject}, ${l.topic}`))
     setAttemptId(id)
     setStepIndex(0)
     setVersion(0)
@@ -185,14 +185,15 @@ export default function App() {
   }
 
   // Offene Übungen: die zwei neuen Aufgaben jedes fertigen Lernpfads, die Luisa noch nicht gemacht hat
-  const finishedLessons = [...new Set(saved.attempts.filter((a) => a.finishedAt).map((a) => a.lessonId))]
+  const current = saved.attempts.filter((a) => !a.archivedAt)
+  const finishedLessons = [...new Set(current.filter((a) => a.finishedAt).map((a) => a.lessonId))]
     .map((id) => lessons[id])
     .filter(Boolean)
     .map((l) => ({ ...l, practice: l.practice.filter((p) => !saved.donePractice.includes(`${l.id}#${p.text}`)) }))
     .filter((l) => l.practice.length > 0)
   // Ältere Einträge ohne Merkmal stammen aus der Testversion, in der jede Aufgabe ein Foto war
-  const photoAttempts = saved.attempts.filter((a) => a.photo ?? a.lessonId === SAMPLE_LESSON.id)
-  const practiced = new Set(saved.attempts.filter((a) => a.finishedAt).map((a) => a.topic))
+  const photoAttempts = current.filter((a) => a.photo ?? a.lessonId === SAMPLE_LESSON.id)
+  const practiced = new Set(current.filter((a) => a.finishedAt).map((a) => a.topic))
 
   switch (screen) {
     case 'home':
@@ -297,6 +298,7 @@ export default function App() {
     case 'pin':
       return <PinGate pin={saved.parentPin} onSetPin={(p) => setSaved((s) => ({ ...s, parentPin: p }))} onOk={() => setScreen('family')} onBack={() => setScreen('home')} />
     case 'family':
-      return <Family saved={saved} lessons={lessons} onBack={() => setScreen('home')} />
+      return <Family saved={saved} lessons={lessons} onArchive={(ids) => setSaved((s) => archiveAttempts(s, ids))}
+          onRestore={(id) => setSaved((s) => restoreAttempt(s, id))} onBack={() => setScreen('home')} />
   }
 }
