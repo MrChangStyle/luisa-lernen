@@ -4,18 +4,19 @@ import { move } from '../logic/selection'
 import { Screen } from '../components/Ui'
 import { SUBJECTS } from '../data/subjects'
 import type { Lesson } from '../types'
-import type { Attempt } from '../state'
+import type { Attempt, LessonEntry } from '../state'
 
 interface MenuProps {
   selection: string[]
   openCount: number
   photoCount: number
+  lessonCount: number
   onSubject: (s: string) => void
-  go: (s: 'selection' | 'open' | 'photos' | 'home') => void
+  go: (s: 'selection' | 'open' | 'photos' | 'lessons' | 'home') => void
 }
 
-export function PracticeMenu({ selection, openCount, photoCount, onSubject, go }: MenuProps) {
-  const item = (to: 'selection' | 'open' | 'photos', title: string, sub: string, n: number) => (
+export function PracticeMenu({ selection, openCount, photoCount, lessonCount, onSubject, go }: MenuProps) {
+  const item = (to: 'selection' | 'open' | 'photos' | 'lessons', title: string, sub: string, n: number) => (
     <button className="card tap" onClick={() => go(to)}>
       <span className="row-between">
         <b>{title}</b>
@@ -47,6 +48,7 @@ export function PracticeMenu({ selection, openCount, photoCount, onSubject, go }
       <p className="q">Oder:</p>
       {item('selection', 'Meine Auswahl', 'Themen, die du selbst ausgesucht hast', selection.length)}
       {item('open', 'Offene Übungen', 'Neue Aufgaben zu dem, was du fertig gemacht hast', openCount)}
+      {item('lessons', 'Meine Aufgaben', 'Alle Aufgaben von Henni, offene und bestandene', lessonCount)}
       {item('photos', 'Aus meinen Fotos', 'Alle Themen, die du schon fotografiert hast', photoCount)}
     </Screen>
   )
@@ -225,6 +227,53 @@ export function PhotosScreen({ attempts, onBack }: { attempts: Attempt[]; onBack
             <span className={`pill ${a.finishedAt ? 'ok' : 'mid'}`}>{a.finishedAt ? 'fertig' : 'angefangen'}</span>
           </div>
         ))}
+    </Screen>
+  )
+}
+
+// Alle Aufgaben, die die KI für Luisa erstellt hat. Bestandene stehen im Archiv und lassen sich wiederholen.
+export function LessonsScreen({ entries, onStart, onBack }: { entries: LessonEntry[]; onStart: (l: Lesson, passed: boolean) => void; onBack: () => void }) {
+  const open = entries.filter((e) => !e.passed)
+  const passed = entries.filter((e) => e.passed)
+  const card = (e: LessonEntry) => (
+    <button key={e.lesson.id} className="card tap" onClick={() => onStart(e.lesson, e.passed)}>
+      <span className="row-between">
+        <b>
+          {e.lesson.subject} · {e.lesson.topic}
+        </b>
+        <span className={`pill ${e.passed ? 'ok' : 'mid'}`}>{e.passed ? 'bestanden' : 'angefangen'}</span>
+      </span>
+      <span className="clamp">
+        <Inline text={e.lesson.task} />
+      </span>
+      <span className="mini">
+        {new Date(e.lastAt).toLocaleDateString('de-DE')} · {e.passed ? 'Tippen zum Wiederholen' : 'Tippen zum Weitermachen'}
+      </span>
+    </button>
+  )
+  return (
+    <Screen
+      foot={
+        <button className="btn sec" onClick={onBack}>
+          Zurück
+        </button>
+      }
+    >
+      <div className="s-title">Meine Aufgaben</div>
+      {entries.length === 0 && <p className="mini">Hier stehen alle Aufgaben, die Henni für dich vorbereitet hat. Noch ist keine da.</p>}
+      {open.length > 0 && (
+        <>
+          <p className="q">Noch nicht fertig</p>
+          {open.map(card)}
+        </>
+      )}
+      {passed.length > 0 && (
+        <>
+          <p className="q">Archiv: schon bestanden</p>
+          <p className="mini">Du kannst jede Aufgabe noch einmal von vorn machen. Ein neues Ei gibt es dafür nicht, das hast du beim ersten Mal schon bekommen.</p>
+          {passed.map(card)}
+        </>
+      )}
     </Screen>
   )
 }

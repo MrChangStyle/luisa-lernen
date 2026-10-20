@@ -83,3 +83,26 @@ export function restoreAttempt(s: Saved, id: string): Saved {
   if (!a?.archivedAt) return s
   return withEvent({ ...s, attempts: s.attempts.map((x) => (x.id === id ? { ...x, archivedAt: null } : x)) }, `Familienbereich: „${a.topic}“ aus dem Archiv zurückgeholt`)
 }
+
+// Hat Luisa diese Aufgabe schon einmal bestanden? Archivierte Versuche zählen mit,
+// denn ein Ei gibt es pro Aufgabe nur beim ersten Bestehen.
+export const passedBefore = (s: Saved, lessonId: string, exceptAttemptId?: string | null) =>
+  s.attempts.some((a) => a.lessonId === lessonId && a.finishedAt && a.id !== exceptAttemptId)
+
+export interface LessonEntry {
+  lesson: Lesson
+  passed: boolean
+  lastAt: string
+}
+
+// Alle Aufgaben der KI, die Luisa angefangen hat, neueste zuerst. Sie bleiben immer in dieser Liste.
+export function lessonOverview(s: Saved): LessonEntry[] {
+  const list: LessonEntry[] = []
+  for (const lesson of Object.values(s.lessons)) {
+    const tries = s.attempts.filter((a) => a.lessonId === lesson.id)
+    if (tries.length === 0) continue
+    const lastAt = tries.map((a) => a.finishedAt ?? a.startedAt).sort().reverse()[0]
+    list.push({ lesson, passed: tries.some((a) => a.finishedAt), lastAt })
+  }
+  return list.sort((a, b) => b.lastAt.localeCompare(a.lastAt))
+}
