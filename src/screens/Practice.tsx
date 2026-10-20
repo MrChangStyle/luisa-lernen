@@ -1,4 +1,6 @@
+import { useState } from 'react'
 import { Inline } from '../components/Rich'
+import { move } from '../logic/selection'
 import { Screen } from '../components/Ui'
 import { SUBJECTS } from '../data/subjects'
 import type { Lesson } from '../types'
@@ -86,29 +88,84 @@ export function SubjectScreen({ subject, selection, onToggle, onSubject, onBack 
   )
 }
 
-export function SelectionScreen({ selection, onStart, onBack }: { selection: string[]; onStart: (topic: string) => void; onBack: () => void }) {
+interface SelectionProps {
+  selection: string[]
+  onStart: (topic: string) => void
+  onChange: (next: string[]) => void
+  onBack: () => void
+}
+
+export function SelectionScreen({ selection, onStart, onChange, onBack }: SelectionProps) {
+  const [chosen, setChosen] = useState<string | null>(null)
+  const [removed, setRemoved] = useState<{ topic: string; index: number } | null>(null)
+  const current = chosen && selection.includes(chosen) ? chosen : (selection[0] ?? null)
+  const ready = current !== null && LESSON_TOPICS.has(current)
+
+  const remove = (i: number) => {
+    setRemoved({ topic: selection[i], index: i })
+    onChange(selection.filter((_, j) => j !== i))
+  }
+  const undo = () => {
+    if (!removed) return
+    const next = [...selection]
+    next.splice(removed.index, 0, removed.topic)
+    onChange(next)
+    setRemoved(null)
+  }
+
   return (
     <Screen
       foot={
-        <button className="btn sec" onClick={onBack}>
-          Zurück
-        </button>
+        <>
+          {current && (
+            <button className="btn" disabled={!ready} onClick={() => current && onStart(current)}>
+              {ready ? `Mit „${current}“ anfangen` : `„${current}“ kommt mit der KI`}
+            </button>
+          )}
+          <button className="btn sec" onClick={onBack}>
+            Zurück
+          </button>
+        </>
       }
     >
       <div className="s-title">Meine Auswahl</div>
-      {selection.length === 0 && <p className="mini">Du hast noch nichts ausgewählt. Tippe bei einem Fach auf ein Thema.</p>}
-      {selection.map((t) =>
-        LESSON_TOPICS.has(t) ? (
-          <button key={t} className="card tap row-between" onClick={() => onStart(t)}>
-            <span>{t}</span>
-            <span className="pill ok">starten</span>
+      {selection.length === 0 ? (
+        <p className="mini">Du hast noch nichts ausgewählt. Tippe bei einem Fach auf ein Thema.</p>
+      ) : (
+        <p className="mini">Tippe auf ein Thema, um damit anzufangen. Mit den Pfeilen änderst du die Reihenfolge. Mit ✕ nimmst du ein Thema heraus.</p>
+      )}
+      <ol className="sel-list">
+        {selection.map((t, i) => (
+          <li key={t} className={`card sel-row${t === current ? ' picked' : ''}`}>
+            <button className="sel-name" aria-pressed={t === current} onClick={() => setChosen(t)}>
+              <span className="sel-num">{i + 1}.</span>
+              <span>
+                {t}
+                <br />
+                <span className={`pill ${LESSON_TOPICS.has(t) ? 'ok' : 'idle'}`}>{LESSON_TOPICS.has(t) ? 'bereit' : 'kommt mit der KI'}</span>
+              </span>
+            </button>
+            <span className="sel-tools">
+              <button className="icon-btn" aria-label={`${t} nach oben`} disabled={i === 0} onClick={() => onChange(move(selection, i, -1))}>
+                ↑
+              </button>
+              <button className="icon-btn" aria-label={`${t} nach unten`} disabled={i === selection.length - 1} onClick={() => onChange(move(selection, i, 1))}>
+                ↓
+              </button>
+              <button className="icon-btn" aria-label={`${t} herausnehmen`} onClick={() => remove(i)}>
+                ✕
+              </button>
+            </span>
+          </li>
+        ))}
+      </ol>
+      {removed && (
+        <div className="fb no row-between" role="status">
+          <span>„{removed.topic}“ ist herausgenommen.</span>
+          <button className="btn sec slim undo" onClick={undo}>
+            Rückgängig
           </button>
-        ) : (
-          <div key={t} className="card row-between">
-            <span>{t}</span>
-            <span className="pill idle">kommt mit der KI</span>
-          </div>
-        ),
+        </div>
       )}
       <p className="mini">In der Testversion gibt es eine fertige Übung: „Brüche addieren“. Die anderen Themen erstellt später die KI.</p>
     </Screen>

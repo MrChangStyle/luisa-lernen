@@ -125,3 +125,12 @@ button { font: inherit; color: inherit; }
 .bar10 i { height: 10px; border-radius: 3px; background: var(--line); }
 .bar10 i.on { background: var(--warn); }
 @media (prefers-reduced-motion: no-preference) { .view > * { animation: in .25s ease-out both; } @keyframes in { from { opacity: .4; } to { opacity: 1; } } }
+
+.sel-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.sel-row { display: flex; align-items: center; gap: 8px; padding: 8px 10px; }
+.sel-name { flex: 1; min-width: 0; display: flex; gap: 8px; align-items: flex-start; text-align: left; background: none; border: 0; padding: 4px; cursor: pointer; }
+.sel-num { font-family: var(--display); font-weight: 700; color: var(--muted); font-variant-numeric: tabular-nums; }
+.sel-tools { display: flex; gap: 4px; }
+.icon-btn { width: 40px; height: 40px; border: 2px solid var(--line); border-radius: 10px; background: var(--bg); font-size: 1.1rem; font-weight: 700; cursor: pointer; }
+.icon-btn:disabled { opacity: .35; cursor: not-allowed; }
+.undo { width: auto; }

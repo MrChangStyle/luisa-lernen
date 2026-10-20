@@ -165,7 +165,14 @@ export default function App() {
         />
       )
     case 'selection':
-      return <SelectionScreen selection={saved.selection} onStart={() => startLesson(lesson, 'Übung gestartet')} onBack={() => setScreen('practice')} />
+      return (
+        <SelectionScreen
+          selection={saved.selection}
+          onStart={(t) => startLesson(lesson, `Übung aus „Meine Auswahl“ gestartet (${t})`)}
+          onChange={(next) => setSaved((s) => ({ ...s, selection: next }))}
+          onBack={() => setScreen('practice')}
+        />
+      )
     case 'open':
       return <OpenScreen lessons={finishedLessons} onBack={() => setScreen('practice')} />
     case 'photos':

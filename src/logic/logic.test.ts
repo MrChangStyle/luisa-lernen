@@ -41,3 +41,15 @@ describe('Prüfen ohne Lösung zu verraten', () => {
     for (const t of texts) expect(t).not.toMatch(/11\s*\/\s*12|\{11\/12\}/)
   })
 })
+
+import { move } from './selection'
+describe('Meine Auswahl', () => {
+  it('verschiebt ein Thema nach oben und unten', () => {
+    expect(move(['a', 'b', 'c'], 2, -1)).toEqual(['a', 'c', 'b'])
+    expect(move(['a', 'b', 'c'], 0, 1)).toEqual(['b', 'a', 'c'])
+  })
+  it('bleibt am Rand unverändert', () => {
+    expect(move(['a', 'b'], 0, -1)).toEqual(['a', 'b'])
+    expect(move(['a', 'b'], 1, 1)).toEqual(['a', 'b'])
+  })
+})
