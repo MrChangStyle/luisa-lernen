@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { addEgg, EMPTY_FARM } from './farm'
 import { checkAnswer } from './check'
 import { SAMPLE_LESSON } from '../data/sampleLesson'
-import { resetAttempts, type Saved } from '../state'
+import { archiveAttempts, restoreAttempt, type Saved } from '../state'
 
 describe('Bauernhof', () => {
   it('gibt ein Ei', () => {
@@ -65,20 +65,25 @@ describe('Aufgaben zurücksetzen', () => {
     events: [],
     parentPin: null,
     lessons: { L1: SAMPLE_LESSON, L2: SAMPLE_LESSON },
-    donePractice: ['L1#x', 'L2#y'],
+    donePractice: ['L1#x'],
   }
-  it('entfernt eine Aufgabe mit Lernpfad und Übungen, der Bauernhof bleibt', () => {
-    const s = resetAttempts(base, ['a1'])
-    expect(s.attempts.map((a) => a.id)).toEqual(['a2'])
-    expect(Object.keys(s.lessons)).toEqual(['L2'])
-    expect(s.donePractice).toEqual(['L2#y'])
+  const last = (s: Saved) => s.events[s.events.length - 1]?.text
+  it('legt eine Aufgabe ins Archiv und löscht nichts', () => {
+    const s = archiveAttempts(base, ['a1'], '2026-10-21T08:00:00Z')
+    expect(s.attempts).toHaveLength(2)
+    expect(s.attempts[0].archivedAt).toBe('2026-10-21T08:00:00Z')
+    expect(s.attempts[1].archivedAt).toBeUndefined()
+    expect(s.lessons).toEqual(base.lessons)
+    expect(s.donePractice).toEqual(base.donePractice)
     expect(s.farm).toEqual(base.farm)
-    expect(s.events[s.events.length - 1]?.text).toBe('Familienbereich: Aufgabe „Thema a1“ zurückgesetzt')
+    expect(last(s)).toBe('Familienbereich: „Thema a1“ zurückgesetzt und archiviert')
   })
-  it('setzt alle Aufgaben zurück', () => {
-    const s = resetAttempts(base, ['a1', 'a2'])
-    expect(s.attempts).toEqual([])
-    expect(s.lessons).toEqual({})
-    expect(s.events[s.events.length - 1]?.text).toBe('Familienbereich: 2 Aufgaben zurückgesetzt')
+  it('setzt alle zurück und holt eine wieder zurück', () => {
+    const all = archiveAttempts(base, ['a1', 'a2'])
+    expect(all.attempts.every((a) => a.archivedAt)).toBe(true)
+    expect(last(all)).toBe('Familienbereich: 2 Aufgaben zurückgesetzt und archiviert')
+    const back = restoreAttempt(all, 'a2')
+    expect(back.attempts[1].archivedAt).toBeNull()
+    expect(last(back)).toBe('Familienbereich: „Thema a2“ aus dem Archiv zurückgeholt')
   })
 })
