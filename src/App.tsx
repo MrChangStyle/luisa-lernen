@@ -50,8 +50,9 @@ export default function App() {
   const [subject, setSubject] = useState('Mathe')
   const [attemptId, setAttemptId] = useState<string | null>(null)
   const [stepIndex, setStepIndex] = useState(0)
-  const [version, setVersion] = useState(0)
-  const [result, setResult] = useState<CheckResult | null>(null)
+  // Pro Schritt gemerkt, damit Luisa zurückgehen kann und ihre Antworten sichtbar bleiben
+  const [versions, setVersions] = useState<number[]>([])
+  const [results, setResults] = useState<(CheckResult | null)[]>([])
   const [reward, setReward] = useState<string[]>([])
   const [lessonId, setLessonId] = useState<string>(SAMPLE_LESSON.id)
   const [job, setJob] = useState<Job | null>(null)
@@ -61,6 +62,10 @@ export default function App() {
 
   const lessons: Record<string, Lesson> = { [SAMPLE_LESSON.id]: SAMPLE_LESSON, ...saved.lessons }
   const lesson = lessons[lessonId] ?? SAMPLE_LESSON
+  const version = versions[stepIndex] ?? 0
+  const result = results[stepIndex] ?? null
+  const setVersion = (v: number) => setVersions((old) => Object.assign([...old], { [stepIndex]: v }))
+  const setResult = (r: CheckResult | null) => setResults((old) => Object.assign([...old], { [stepIndex]: r }))
   const today = dayKey(new Date())
   const todayMood = saved.mood[today]
 
@@ -133,8 +138,8 @@ export default function App() {
     setSaved((s) => withEvent({ ...s, attempts: [...s.attempts, attempt] }, `${how}: ${l.subject}, ${l.topic}`))
     setAttemptId(id)
     setStepIndex(0)
-    setVersion(0)
-    setResult(null)
+    setVersions([])
+    setResults([])
     setScreen('step')
   }
 
@@ -163,11 +168,14 @@ export default function App() {
     setScreen('home')
   }
 
+  const onGoTo = (i: number) => {
+    setStepIndex(i)
+    setSaved((s) => withEvent(s, `Zurück zu Schritt ${i + 1}`))
+  }
+
   const onNext = () => {
     if (stepIndex < lesson.steps.length - 1) {
       setStepIndex(stepIndex + 1)
-      setVersion(0)
-      setResult(null)
       return
     }
     const { farm, messages } = addEgg(saved.farm)
@@ -233,7 +241,7 @@ export default function App() {
     case 'confirm':
       return <Confirm lesson={lesson} onYes={() => startLesson(lesson, job?.how ?? 'Foto gemacht und bestätigt', true)} onNo={() => setScreen('camera')} />
     case 'step':
-      return <StepScreen lesson={lesson} index={stepIndex} version={version} result={result} onAgain={onAgain} onResult={onResult} onNext={onNext} onStop={onStop} />
+      return <StepScreen lesson={lesson} index={stepIndex} version={version} results={results} onGoTo={onGoTo} onAgain={onAgain} onResult={onResult} onNext={onNext} onStop={onStop} />
     case 'done':
       return <Done lesson={lesson} farm={saved.farm} rewardMessages={reward} onFarm={() => setScreen('farm')} onHome={() => setScreen('home')} />
     case 'practice':
