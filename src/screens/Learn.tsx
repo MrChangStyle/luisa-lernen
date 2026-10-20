@@ -138,9 +138,17 @@ export function Confirm({ lesson, onYes, onNo }: { lesson: Lesson; onYes: () => 
   )
 }
 
+// Beim Zurückgehen stehen Luisas frühere Eingaben wieder in den Feldern
+function earlierInput(c: Step['check'], r: CheckResult | null): string[] {
+  if (!r) return []
+  if (c.type === 'fraction') return r.given.split('/')
+  if (c.type === 'numerators') return r.given.split(' und ').map((g) => g.split('/')[0])
+  return [r.given]
+}
+
 function CheckBox({ step, result, onResult }: { step: Step; result: CheckResult | null; onResult: (r: CheckResult) => void }) {
   const c = step.check
-  const [vals, setVals] = useState<string[]>([])
+  const [vals, setVals] = useState<string[]>(() => earlierInput(c, result))
   const set = (i: number, v: string) => setVals((old) => Object.assign([...old], { [i]: v }))
   const submit = (input = vals) => {
     const r = checkAnswer(c, input)
@@ -214,14 +222,41 @@ interface StepProps {
   lesson: Lesson
   index: number
   version: number
-  result: CheckResult | null
+  results: (CheckResult | null)[]
+  onGoTo: (index: number) => void
   onAgain: () => void
   onResult: (r: CheckResult) => void
   onNext: () => void
   onStop: () => void
 }
 
-export function StepScreen({ lesson, index, version, result, onAgain, onResult, onNext, onStop }: StepProps) {
+// Was Luisa in den Schritten davor herausgefunden hat. Ein Tipp führt zurück zu diesem Schritt.
+function Earlier({ lesson, index, results, onGoTo }: { lesson: Lesson; index: number; results: (CheckResult | null)[]; onGoTo: (i: number) => void }) {
+  if (index === 0) return null
+  return (
+    <section className="earlier" aria-label="Das hast du schon herausgefunden">
+      <b>Das hast du schon herausgefunden:</b>
+      <ol>
+        {lesson.steps.slice(0, index).map((s, i) => (
+          <li key={i}>
+            <button type="button" onClick={() => onGoTo(i)}>
+              <span className="mini">Schritt {i + 1}: {s.title}</span>
+              <span>
+                <Inline text={s.check.question} />
+                <br />
+                <b>Deine Antwort: {results[i]?.given ?? '–'}</b>
+              </span>
+            </button>
+          </li>
+        ))}
+      </ol>
+      <span className="mini">Tippe auf einen Schritt, um ihn dir noch einmal anzusehen.</span>
+    </section>
+  )
+}
+
+export function StepScreen({ lesson, index, version, results, onGoTo, onAgain, onResult, onNext, onStop }: StepProps) {
+  const result = results[index] ?? null
   const step = lesson.steps[index]
   const v = step.versions[version]
   const [term, setTerm] = useState<string | null>(null)
@@ -238,6 +273,11 @@ export function StepScreen({ lesson, index, version, result, onAgain, onResult, 
           <button className="btn" onClick={onNext} disabled={!ok}>
             {last ? 'Fertig' : `Weiter zu Schritt ${index + 2}`}
           </button>
+          {index > 0 && (
+            <button className="btn sec" onClick={() => onGoTo(index - 1)}>
+              Zurück zu Schritt {index}
+            </button>
+          )}
           <button className="link" onClick={onStop}>
             Aufhören und zur Startseite
           </button>
@@ -256,6 +296,7 @@ export function StepScreen({ lesson, index, version, result, onAgain, onResult, 
         <summary>Die Aufgabe</summary>
         <Rich text={lesson.task} />
       </details>
+      <Earlier lesson={lesson} index={index} results={results} onGoTo={onGoTo} />
       <div className="s-title">{step.title}</div>
       <HenniSays>
         <span className="vlabel">
