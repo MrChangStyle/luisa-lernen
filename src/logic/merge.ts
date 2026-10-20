@@ -1,5 +1,4 @@
-import type { Farm } from '../types'
-import type { Attempt, Saved } from '../state'
+import type { Attempt, Farm, Saved } from '../types.js'
 
 // Führt zwei Stände zusammen, z. B. Handy und Tablet. Nichts geht verloren:
 // Aufgaben, Lernpfade, Stimmungen und Protokoll werden vereinigt, der Bauernhof wächst nur.
