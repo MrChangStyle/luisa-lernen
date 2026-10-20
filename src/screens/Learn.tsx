@@ -330,7 +330,7 @@ export function StepScreen({ lesson, index, version, results, onGoTo, onAgain, o
   )
 }
 
-export function Done({ lesson, farm, rewardMessages, onFarm, onHome }: { lesson: Lesson; farm: Farm; rewardMessages: string[]; onFarm: () => void; onHome: () => void }) {
+export function Done({ lesson, farm, egg, rewardMessages, onFarm, onHome }: { lesson: Lesson; farm: Farm; egg: boolean; rewardMessages: string[]; onFarm: () => void; onHome: () => void }) {
   return (
     <Screen
       foot={
@@ -342,7 +342,7 @@ export function Done({ lesson, farm, rewardMessages, onFarm, onHome }: { lesson:
       <div className="s-title">Du hast die Aufgabe fertig.</div>
       <p>Du hast alle {lesson.steps.length} Schritte gemacht. Schreibe dein Ergebnis jetzt in dein Heft.</p>
       <section className="card stack">
-        <b>Du bekommst 1 Ei für deinen Bauernhof.</b>
+        <b>{egg ? 'Du bekommst 1 Ei für deinen Bauernhof.' : 'Diese Aufgabe hast du schon einmal bestanden. Das Ei dafür hast du schon bekommen.'}</b>
         {rewardMessages.map((m) => (
           <span key={m}>{m}</span>
         ))}

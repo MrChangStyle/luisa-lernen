@@ -9,8 +9,8 @@ import { FarmScreen } from './screens/Farm'
 import { Home } from './screens/Home'
 import { Camera, Confirm, Done, Problem, StepScreen, Waiting } from './screens/Learn'
 import { SUBJECTS } from './data/subjects'
-import { OpenScreen, PhotosScreen, PracticeMenu, SelectionScreen, SubjectScreen } from './screens/Practice'
-import { archiveAttempts, clock, restoreAttempt, useSaved, withEvent, withLesson, type Attempt } from './state'
+import { LessonsScreen, OpenScreen, PhotosScreen, PracticeMenu, SelectionScreen, SubjectScreen } from './screens/Practice'
+import { archiveAttempts, clock, lessonOverview, passedBefore, restoreAttempt, useSaved, withEvent, withLesson, type Attempt } from './state'
 import { VERSION_LABEL, type Lesson } from './types'
 
 const subjectOf = (topic: string) => Object.keys(SUBJECTS).find((k) => SUBJECTS[k].some((t) => t.name === topic)) ?? 'Mathe'
@@ -38,6 +38,7 @@ type ScreenName =
   | 'selection'
   | 'open'
   | 'photos'
+  | 'lessons'
   | 'farm'
   | 'pin'
   | 'family'
@@ -54,6 +55,7 @@ export default function App() {
   const [versions, setVersions] = useState<number[]>([])
   const [results, setResults] = useState<(CheckResult | null)[]>([])
   const [reward, setReward] = useState<string[]>([])
+  const [gotEgg, setGotEgg] = useState(true)
   const [lessonId, setLessonId] = useState<string>(SAMPLE_LESSON.id)
   const [job, setJob] = useState<Job | null>(null)
   const [problem, setProblem] = useState<{ text: string; retry: 'again' | 'photo'; detail?: string } | null>(null)
@@ -178,14 +180,17 @@ export default function App() {
       setStepIndex(stepIndex + 1)
       return
     }
-    const { farm, messages } = addEgg(saved.farm)
+    // Ein Ei gibt es pro Aufgabe nur beim ersten Bestehen. Wiederholen ist Übung ohne neues Tier.
+    const first = !passedBefore(saved, lesson.id, attemptId)
+    const { farm, messages } = first ? addEgg(saved.farm) : { farm: saved.farm, messages: [] }
     setReward(messages)
+    setGotEgg(first)
     updateAttempt((a) => ({ ...a, finishedAt: new Date().toISOString() }))
     const done = practiceKey
     setSaved((s) =>
       withEvent(
         { ...s, farm, donePractice: done && !s.donePractice.includes(done) ? [...s.donePractice, done] : s.donePractice },
-        `Aufgabe fertig, 1 Ei bekommen${messages.length ? '. ' + messages.join(' ') : ''}`,
+        first ? `Aufgabe fertig, 1 Ei bekommen${messages.length ? '. ' + messages.join(' ') : ''}` : 'Aufgabe wiederholt und fertig (kein neues Ei, schon einmal bestanden)',
       ),
     )
     setPracticeKey(null)
@@ -201,6 +206,7 @@ export default function App() {
     .filter((l) => l.practice.length > 0)
   // Ältere Einträge ohne Merkmal stammen aus der Testversion, in der jede Aufgabe ein Foto war
   const photoAttempts = current.filter((a) => a.photo ?? a.lessonId === SAMPLE_LESSON.id)
+  const overview = lessonOverview(saved)
   const practiced = new Set(current.filter((a) => a.finishedAt).map((a) => a.topic))
 
   switch (screen) {
@@ -243,13 +249,14 @@ export default function App() {
     case 'step':
       return <StepScreen lesson={lesson} index={stepIndex} version={version} results={results} onGoTo={onGoTo} onAgain={onAgain} onResult={onResult} onNext={onNext} onStop={onStop} />
     case 'done':
-      return <Done lesson={lesson} farm={saved.farm} rewardMessages={reward} onFarm={() => setScreen('farm')} onHome={() => setScreen('home')} />
+      return <Done lesson={lesson} farm={saved.farm} egg={gotEgg} rewardMessages={reward} onFarm={() => setScreen('farm')} onHome={() => setScreen('home')} />
     case 'practice':
       return (
         <PracticeMenu
           selection={saved.selection}
           openCount={finishedLessons.reduce((n, l) => n + l.practice.length, 0)}
           photoCount={photoAttempts.length}
+          lessonCount={overview.length}
           onSubject={(s) => {
             setSubject(s)
             setScreen('subject')
@@ -299,6 +306,8 @@ export default function App() {
           onBack={() => setScreen('practice')}
         />
       )
+    case 'lessons':
+      return <LessonsScreen entries={overview} onStart={(l, passed) => startLesson(l, passed ? 'Aufgabe wiederholt' : 'Aufgabe weitergemacht')} onBack={() => setScreen('practice')} />
     case 'photos':
       return <PhotosScreen attempts={photoAttempts} onBack={() => setScreen('practice')} />
     case 'farm':

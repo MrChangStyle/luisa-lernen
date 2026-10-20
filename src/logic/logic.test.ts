@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { addEgg, EMPTY_FARM } from './farm'
 import { checkAnswer } from './check'
 import { SAMPLE_LESSON } from '../data/sampleLesson'
-import { archiveAttempts, restoreAttempt, type Saved } from '../state'
+import { archiveAttempts, lessonOverview, passedBefore, restoreAttempt, type Saved } from '../state'
 
 describe('Bauernhof', () => {
   it('gibt ein Ei', () => {
@@ -85,5 +85,35 @@ describe('Aufgaben zurücksetzen', () => {
     const back = restoreAttempt(all, 'a2')
     expect(back.attempts[1].archivedAt).toBeNull()
     expect(last(back)).toBe('Familienbereich: „Thema a2“ aus dem Archiv zurückgeholt')
+  })
+})
+
+describe('Meine Aufgaben und Ei nur beim ersten Bestehen', () => {
+  const L = (id: string) => ({ ...SAMPLE_LESSON, id })
+  const s: Saved = {
+    farm: { egg: 0, chick: 0, hen: 0, rooster: 0, cow: 0 },
+    mood: {},
+    selection: [],
+    attempts: [
+      { id: 'a1', lessonId: 'L1', subject: 'Mathe', topic: 'T1', source: 'Foto', startedAt: '2026-10-20T10:00:00Z', finishedAt: '2026-10-20T10:05:00Z', stats: [], archivedAt: '2026-10-20T11:00:00Z' },
+      { id: 'a2', lessonId: 'L2', subject: 'Mathe', topic: 'T2', source: 'Übung', startedAt: '2026-10-20T12:00:00Z', finishedAt: null, stats: [] },
+      { id: 'a3', lessonId: 'L1', subject: 'Mathe', topic: 'T1', source: 'Foto', startedAt: '2026-10-20T13:00:00Z', finishedAt: null, stats: [] },
+    ],
+    events: [],
+    parentPin: null,
+    lessons: { L1: L('L1'), L2: L('L2'), L3: L('L3') },
+    donePractice: [],
+  }
+  it('zählt archivierte Versuche als bestanden, damit es kein zweites Ei gibt', () => {
+    expect(passedBefore(s, 'L1', 'a3')).toBe(true)
+    expect(passedBefore(s, 'L2', 'a2')).toBe(false)
+    expect(passedBefore(s, 'L1', 'a1')).toBe(false)
+  })
+  it('zeigt alle angefangenen Aufgaben, neueste zuerst, auch archivierte', () => {
+    const o = lessonOverview(s)
+    expect(o.map((e) => [e.lesson.id, e.passed])).toEqual([
+      ['L1', true],
+      ['L2', false],
+    ])
   })
 })
