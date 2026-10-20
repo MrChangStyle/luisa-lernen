@@ -3,7 +3,7 @@ import { Face } from '../components/Art'
 import { Inline } from '../components/Rich'
 import { Ladder, Screen } from '../components/Ui'
 import { dayKey, moodText } from '../logic/mood'
-import { clock, dateLabel, type Saved } from '../state'
+import { clock, dateLabel, type CloudState, type Saved } from '../state'
 import type { Lesson } from '../types'
 import { VERSION_LABEL } from '../types'
 
@@ -50,13 +50,14 @@ export function PinGate({ pin, onSetPin, onOk, onBack }: { pin: string | null; o
 
 interface FamilyProps {
   saved: Saved
+  cloud: CloudState
   lessons: Record<string, Lesson>
   onArchive: (ids: string[]) => void
   onRestore: (id: string) => void
   onBack: () => void
 }
 
-export function Family({ saved, lessons, onArchive, onRestore, onBack }: FamilyProps) {
+export function Family({ saved, cloud, lessons, onArchive, onRestore, onBack }: FamilyProps) {
   // Welche Aufgabe gerade auf „Wirklich zurücksetzen?“ wartet: eine Id oder „alle“
   const [asking, setAsking] = useState<string | null>(null)
   const current = saved.attempts.filter((a) => !a.archivedAt)
@@ -141,6 +142,26 @@ export function Family({ saved, lessons, onArchive, onRestore, onBack }: FamilyP
       }
     >
       <div className="s-title">Familienbereich</div>
+      <p className={`mini cloud ${cloud}`} role="status">
+        {
+          {
+            laden: 'Cloud: Abgleich läuft …',
+            ok: '✓ Cloud: Alles ist gespeichert und auf jedem angemeldeten Gerät gleich.',
+            aus: 'Cloud: noch nicht eingerichtet. Im Moment ist alles nur auf diesem Gerät gespeichert.',
+            fehler: 'Cloud: gerade keine Verbindung. Die Änderungen werden nachgeholt.',
+          }[cloud]
+        }
+      </p>
+      <p className={`mini cloud ${cloud}`} role="status">
+        {
+          {
+            laden: 'Cloud: Abgleich läuft …',
+            ok: '✓ Cloud: Alles ist gespeichert und auf jedem angemeldeten Gerät gleich.',
+            aus: 'Cloud: noch nicht eingerichtet. Im Moment ist alles nur auf diesem Gerät gespeichert.',
+            fehler: 'Cloud: gerade keine Verbindung. Die Änderungen werden nachgeholt.',
+          }[cloud]
+        }
+      </p>
       <section className="card mood-row">
         {todayMood ? <Face value={todayMood.value} size={56} /> : <span className="mini">–</span>}
         <div>

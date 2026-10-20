@@ -44,7 +44,7 @@ type ScreenName =
   | 'family'
 
 export default function App() {
-  const [saved, setSaved] = useSaved()
+  const [saved, setSaved, cloud] = useSaved()
   const [screen, setScreen] = useState<ScreenName>('home')
   const [mood, setMood] = useState(() => saved.mood[dayKey(new Date())]?.value ?? 50)
   const [moodTouched, setMoodTouched] = useState(false)
@@ -330,7 +330,7 @@ export default function App() {
     case 'pin':
       return <PinGate pin={saved.parentPin} onSetPin={(p) => setSaved((s) => ({ ...s, parentPin: p }))} onOk={() => setScreen('family')} onBack={() => setScreen('home')} />
     case 'family':
-      return <Family saved={saved} lessons={lessons} onArchive={(ids) => setSaved((s) => archiveAttempts(s, ids))}
+      return <Family saved={saved} cloud={cloud} lessons={lessons} onArchive={(ids) => setSaved((s) => archiveAttempts(s, ids))}
           onRestore={(id) => setSaved((s) => restoreAttempt(s, id))} onBack={() => setScreen('home')} />
   }
 }

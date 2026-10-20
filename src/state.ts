@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { Farm, Lesson, LogEvent, StepStat } from './types'
 import { EMPTY_FARM } from './logic/farm'
+import { mergeSaved } from './logic/merge'
 
-// Alles, was gespeichert bleibt. In dieser Testversion nur auf dem Gerät (localStorage);
-// später in der Familien-Datenbank, damit beide Eltern es auf ihren Handys sehen.
+// Alles, was gespeichert bleibt. Der Stand liegt in der Cloud (api/data.ts, Supabase EU), damit Luisa
+// und beide Eltern auf jedem Gerät dasselbe sehen. Eine Kopie bleibt auf dem Gerät für Funklöcher.
 export interface Attempt {
   id: string
   lessonId: string
@@ -46,8 +47,32 @@ function load(): Saved {
   }
 }
 
+// laden: erster Abgleich läuft · ok: alles in der Cloud · aus: Cloud nicht eingerichtet · fehler: keine Verbindung, wird nachgeholt
+export type CloudState = 'laden' | 'ok' | 'aus' | 'fehler'
+
+async function cloudCall(method: 'GET' | 'PUT', saved?: Saved): Promise<{ saved: Saved | null } | 'aus' | 'fehler'> {
+  try {
+    const res = await fetch('/api/data', {
+      method,
+      headers: { 'content-type': 'application/json' },
+      body: saved ? JSON.stringify({ saved }) : undefined,
+      cache: 'no-store',
+    })
+    if (res.status === 503) return 'aus'
+    if (!res.ok) return 'fehler'
+    return await res.json()
+  } catch {
+    return 'fehler'
+  }
+}
+
 export function useSaved() {
   const [saved, setSaved] = useState<Saved>(load)
+  const [cloud, setCloud] = useState<CloudState>('laden')
+  const [ready, setReady] = useState(false)
+  const [retry, setRetry] = useState(0)
+  const synced = useRef<string | null>(null)
+
   useEffect(() => {
     try {
       localStorage.setItem(KEY, JSON.stringify(saved))
@@ -55,7 +80,51 @@ export function useSaved() {
       // Speicher voll oder gesperrt: App läuft trotzdem weiter
     }
   }, [saved])
-  return [saved, setSaved] as const
+
+  // Stand aus der Cloud holen: beim Start und wenn die App wieder in den Vordergrund kommt
+  useEffect(() => {
+    const pull = async () => {
+      const r = await cloudCall('GET')
+      if (r === 'aus' || r === 'fehler') {
+        setCloud(r)
+      } else if (r.saved) {
+        const fromCloud = r.saved
+        setSaved((cur) => mergeSaved(cur, { ...initial, ...fromCloud }))
+        setCloud('ok')
+      }
+      setReady(true)
+    }
+    void pull()
+    const onShow = () => document.visibilityState === 'visible' && void pull()
+    document.addEventListener('visibilitychange', onShow)
+    return () => document.removeEventListener('visibilitychange', onShow)
+  }, [])
+
+  // Jede Änderung kurz danach in die Cloud schreiben. Der Server führt sie mit dem Stand anderer Geräte zusammen.
+  useEffect(() => {
+    if (!ready || cloud === 'aus') return
+    const sent = JSON.stringify(saved)
+    if (sent === synced.current) return
+    const t = setTimeout(async () => {
+      const r = await cloudCall('PUT', saved)
+      if (r === 'aus' || r === 'fehler') {
+        setCloud(r)
+        if (r === 'fehler') setTimeout(() => setRetry((n) => n + 1), 20000)
+        return
+      }
+      const fromCloud = r.saved ?? saved
+      setSaved((cur) => {
+        const next = mergeSaved(fromCloud, cur)
+        // Nur als abgeglichen merken, wenn in der Zwischenzeit nichts Neues dazukam
+        if (JSON.stringify(cur) === sent) synced.current = JSON.stringify(next)
+        return next
+      })
+      setCloud('ok')
+    }, 1200)
+    return () => clearTimeout(t)
+  }, [saved, ready, cloud, retry])
+
+  return [saved, setSaved, cloud] as const
 }
 
 export const withEvent = (s: Saved, text: string): Saved => ({
