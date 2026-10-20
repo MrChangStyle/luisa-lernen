@@ -6,7 +6,7 @@ export type LessonAsk =
   | { mode: 'topic'; subject: string; topic: string }
   | { mode: 'task'; subject: string; topic: string; text: string }
 
-export type LessonAnswer = { lesson: Lesson } | { problem: string } | { error: string }
+export type LessonAnswer = { lesson: Lesson } | { problem: string } | { error: string; detail?: string }
 
 export async function requestLesson(ask: LessonAsk, signal: AbortSignal): Promise<LessonAnswer> {
   try {

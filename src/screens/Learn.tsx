@@ -82,7 +82,7 @@ export function Waiting({ text, onCancel }: { text: string; onCancel: () => void
   )
 }
 
-export function Problem({ text, retry, onRetry, onBack }: { text: string; retry: string; onRetry: () => void; onBack: () => void }) {
+export function Problem({ text, detail, retry, onRetry, onBack }: { text: string; detail?: string; retry: string; onRetry: () => void; onBack: () => void }) {
   return (
     <Screen
       foot={
@@ -100,6 +100,7 @@ export function Problem({ text, retry, onRetry, onBack }: { text: string; retry:
         <div className="s-title small">Das hat nicht geklappt.</div>
         <div>{text}</div>
       </HenniSays>
+      {detail && <p className="mini">Für Eltern: {detail}</p>}
     </Screen>
   )
 }
