@@ -152,16 +152,6 @@ export function Family({ saved, cloud, lessons, onArchive, onRestore, onBack }: 
           }[cloud]
         }
       </p>
-      <p className={`mini cloud ${cloud}`} role="status">
-        {
-          {
-            laden: 'Cloud: Abgleich läuft …',
-            ok: '✓ Cloud: Alles ist gespeichert und auf jedem angemeldeten Gerät gleich.',
-            aus: 'Cloud: noch nicht eingerichtet. Im Moment ist alles nur auf diesem Gerät gespeichert.',
-            fehler: 'Cloud: gerade keine Verbindung. Die Änderungen werden nachgeholt.',
-          }[cloud]
-        }
-      </p>
       <section className="card mood-row">
         {todayMood ? <Face value={todayMood.value} size={56} /> : <span className="mini">–</span>}
         <div>
