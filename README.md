@@ -27,14 +27,22 @@ Ohne Schlüssel zeigt die App beim Start einer Aufgabe: „Die KI ist noch nicht
 
 Ein Lernpfad dauert meistens ein bis zwei Minuten. Der Wächter in `api/lesson.ts` prüft danach, dass kein Ergebnis mit Zahlen in den Erklärungen steht. Findet er eins, schreibt die KI den Lernpfad einmal neu; klappt das auch nicht, bekommt Luisa die Aufgabe nicht.
 
+## Passwort einrichten
+
+Die ganze App ist mit einem Familien-Passwort geschützt (`middleware.ts`). Ohne Anmeldung zeigt Vercel nur die Anmeldeseite, und die KI-Schnittstelle antwortet nicht.
+
+1. In Vercel unter **Settings → Environment Variables** den Namen `APP_PASSWORD` mit dem gewünschten Passwort eintragen.
+2. Unter **Deployments** beim neuesten Eintrag „Redeploy“ wählen.
+
+Jedes Gerät meldet sich einmal an und bleibt ein Jahr angemeldet. Wer das Passwort in Vercel ändert, meldet damit alle Geräte ab.
+
 ## Stand
 
 - Foto: Henni liest die Aufgabe und fragt „Ist das die richtige Aufgabe?“. Ist das Foto unlesbar, sagt Henni, was Luisa tun kann.
 - Meine Übungen: Ein Tipp auf ein Thema startet sofort eine neue Aufgabe dazu. „+ Auswahl“ legt das Thema in „Meine Auswahl“; dort startet ein Tipp ebenfalls sofort. Offene Übungen starten auch mit einem Tipp.
 - Alles wird nur auf dem Gerät gespeichert (localStorage). Die Eltern-PIN schützt nur vor versehentlichem Öffnen.
-- Die Server-Funktion hat noch keine Anmeldung. Wer die Adresse kennt, kann Aufgaben erstellen lassen, die über den Schlüssel bezahlt werden.
 
 ## Nächste Schritte
 
-1. Familien-Datenbank (z. B. Supabase, EU): Konten für Luisa, Mama und Papa, Verlauf auf allen Geräten, und damit auch eine Anmeldung für die Server-Funktion.
+1. Familien-Datenbank (z. B. Supabase, EU): Konten für Luisa, Mama und Papa, Verlauf auf allen Geräten.
 2. Antworten auf dem Server prüfen, damit keine Lösung im Handy liegt.
