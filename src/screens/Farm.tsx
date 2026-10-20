@@ -24,7 +24,7 @@ export function FarmScreen({ farm, onBack }: { farm: Farm; onBack: () => void })
       <EggBar farm={farm} />
       <div className="why">
         <b>So wächst dein Bauernhof</b>
-        Für jede richtig fertige Aufgabe bekommst du 1 Ei. 10 Eier werden 1 Küken. 10 Küken werden 1 Huhn. 10 Hühner werden 1 Hahn. 10 Hähne werden 1 Kuh. Tiere gehen nie verloren.
+        Für jede richtig fertige Aufgabe bekommst du 1 Ei. Einmal am Tag bekommst du auch 1 Ei, wenn du deine Stimmung bestätigst. 10 Eier werden 1 Küken. 10 Küken werden 1 Huhn. 10 Hühner werden 1 Hahn. 10 Hähne werden 1 Kuh. Tiere gehen nie verloren.
       </div>
     </Screen>
   )
