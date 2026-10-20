@@ -146,3 +146,4 @@ button { font: inherit; color: inherit; }
 .topic-row .card.tap { align-content: center; }
 .pick-btn { border: 2px solid var(--line); background: var(--bg); border-radius: 12px; padding: 6px 10px; font-weight: 700; font-size: .8rem; color: var(--accent); cursor: pointer; min-width: 92px; }
 .pick-btn[aria-pressed=true] { border-color: var(--accent); background: var(--accent-soft); }
+.fb.stack { display: grid; gap: 8px; }

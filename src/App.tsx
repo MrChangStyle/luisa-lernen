@@ -10,7 +10,7 @@ import { Home } from './screens/Home'
 import { Camera, Confirm, Done, Problem, StepScreen, Waiting } from './screens/Learn'
 import { SUBJECTS } from './data/subjects'
 import { OpenScreen, PhotosScreen, PracticeMenu, SelectionScreen, SubjectScreen } from './screens/Practice'
-import { clock, useSaved, withEvent, withLesson, type Attempt } from './state'
+import { clock, resetAttempts, useSaved, withEvent, withLesson, type Attempt } from './state'
 import { VERSION_LABEL, type Lesson } from './types'
 
 const subjectOf = (topic: string) => Object.keys(SUBJECTS).find((k) => SUBJECTS[k].some((t) => t.name === topic)) ?? 'Mathe'
@@ -297,6 +297,6 @@ export default function App() {
     case 'pin':
       return <PinGate pin={saved.parentPin} onSetPin={(p) => setSaved((s) => ({ ...s, parentPin: p }))} onOk={() => setScreen('family')} onBack={() => setScreen('home')} />
     case 'family':
-      return <Family saved={saved} lessons={lessons} onBack={() => setScreen('home')} />
+      return <Family saved={saved} lessons={lessons} onReset={(ids) => setSaved((s) => resetAttempts(s, ids))} onBack={() => setScreen('home')} />
   }
 }

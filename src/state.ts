@@ -67,3 +67,16 @@ export const withLesson = (s: Saved, l: Lesson): Saved => {
   const ids = [...Object.keys(s.lessons).filter((id) => id !== l.id), l.id].slice(-40)
   return { ...s, lessons: Object.fromEntries(ids.map((id) => [id, id === l.id ? l : s.lessons[id]])) }
 }
+
+// Familienbereich: Aufgaben zurücksetzen. Die Aufgabe verschwindet aus der Liste, aus „Aus meinen Fotos“
+// und mit ihr die offenen Übungen dazu. Der Bauernhof bleibt, damit Luisa nichts verliert.
+export function resetAttempts(s: Saved, ids: string[]): Saved {
+  const gone = s.attempts.filter((a) => ids.includes(a.id))
+  if (gone.length === 0) return s
+  const attempts = s.attempts.filter((a) => !ids.includes(a.id))
+  const used = new Set(attempts.map((a) => a.lessonId))
+  const lessons = Object.fromEntries(Object.entries(s.lessons).filter(([id]) => used.has(id)))
+  const donePractice = s.donePractice.filter((k) => used.has(k.split('#')[0]))
+  const text = gone.length === 1 ? `Familienbereich: Aufgabe „${gone[0].topic}“ zurückgesetzt` : `Familienbereich: ${gone.length} Aufgaben zurückgesetzt`
+  return withEvent({ ...s, attempts, lessons, donePractice }, text)
+}

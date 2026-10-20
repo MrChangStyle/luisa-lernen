@@ -48,7 +48,40 @@ export function PinGate({ pin, onSetPin, onOk, onBack }: { pin: string | null; o
   )
 }
 
-export function Family({ saved, lessons, onBack }: { saved: Saved; lessons: Record<string, Lesson>; onBack: () => void }) {
+interface FamilyProps {
+  saved: Saved
+  lessons: Record<string, Lesson>
+  onReset: (ids: string[]) => void
+  onBack: () => void
+}
+
+export function Family({ saved, lessons, onReset, onBack }: FamilyProps) {
+  // Welche Aufgabe gerade auf „Wirklich zurücksetzen?“ wartet: eine Id oder „alle“
+  const [asking, setAsking] = useState<string | null>(null)
+  const ask = (what: string, question: string, ids: string[]) =>
+    asking === what ? (
+      <div className="fb no stack" role="alertdialog" aria-label={question}>
+        <span>{question} Luisas Bauernhof bleibt, wie er ist.</span>
+        <div className="row2">
+          <button
+            className="btn slim"
+            onClick={() => {
+              onReset(ids)
+              setAsking(null)
+            }}
+          >
+            Ja, zurücksetzen
+          </button>
+          <button className="btn sec slim" onClick={() => setAsking(null)}>
+            Abbrechen
+          </button>
+        </div>
+      </div>
+    ) : (
+      <button className="btn sec slim" onClick={() => setAsking(what)}>
+        {what === 'alle' ? 'Alle Aufgaben zurücksetzen' : 'Diese Aufgabe zurücksetzen'}
+      </button>
+    )
   const today = dayKey(new Date())
   const todayMood = saved.mood[today]
   const week = Object.entries(saved.mood).sort().slice(-7)
@@ -78,6 +111,12 @@ export function Family({ saved, lessons, onBack }: { saved: Saved; lessons: Reco
       </section>
       <div className="s-title small">Aufgaben</div>
       {saved.attempts.length === 0 && <p className="mini">Noch keine Aufgaben.</p>}
+      {saved.attempts.length > 1 &&
+        ask(
+          'alle',
+          `Wirklich alle ${saved.attempts.length} Aufgaben zurücksetzen?`,
+          saved.attempts.map((a) => a.id),
+        )}
       {saved.attempts
         .slice()
         .reverse()
@@ -120,6 +159,7 @@ export function Family({ saved, lessons, onBack }: { saved: Saved; lessons: Reco
                   <b>Lösung (nur für Eltern):</b> {lesson.parentSolution}
                 </div>
               )}
+              {ask(a.id, `„${a.topic}“ wirklich zurücksetzen?`, [a.id])}
             </section>
           )
         })}
