@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import type { Farm, LogEvent, StepStat } from './types'
+import type { Farm, Lesson, LogEvent, StepStat } from './types'
 import { EMPTY_FARM } from './logic/farm'
 
 // Alles, was gespeichert bleibt. In dieser Testversion nur auf dem Gerät (localStorage);
@@ -13,6 +13,8 @@ export interface Attempt {
   startedAt: string
   finishedAt: string | null
   stats: StepStat[]
+  // true, wenn die Aufgabe von Luisas Foto stammt
+  photo?: boolean
 }
 
 export interface Saved {
@@ -22,11 +24,15 @@ export interface Saved {
   attempts: Attempt[]
   events: LogEvent[]
   parentPin: string | null
+  // Lernpfade, die die KI erstellt hat (die neuesten 40)
+  lessons: Record<string, Lesson>
+  // Übungen aus „Offene Übungen“, die Luisa schon fertig gemacht hat: "lessonId#nummer"
+  donePractice: string[]
 }
 
 const KEY = 'luisa-lernen:v1'
 
-const initial: Saved = { farm: EMPTY_FARM, mood: {}, selection: [], attempts: [], events: [], parentPin: null }
+const initial: Saved = { farm: EMPTY_FARM, mood: {}, selection: [], attempts: [], events: [], parentPin: null, lessons: {}, donePractice: [] }
 
 function load(): Saved {
   try {
@@ -56,3 +62,8 @@ export const withEvent = (s: Saved, text: string): Saved => ({
 
 export const clock = (iso: string) => new Date(iso).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })
 export const dateLabel = (iso: string) => new Date(iso).toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' })
+
+export const withLesson = (s: Saved, l: Lesson): Saved => {
+  const ids = [...Object.keys(s.lessons).filter((id) => id !== l.id), l.id].slice(-40)
+  return { ...s, lessons: Object.fromEntries(ids.map((id) => [id, id === l.id ? l : s.lessons[id]])) }
+}

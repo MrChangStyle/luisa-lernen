@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Face } from '../components/Art'
+import { Inline } from '../components/Rich'
 import { Ladder, Screen } from '../components/Ui'
 import { dayKey, moodText } from '../logic/mood'
 import { clock, dateLabel, type Saved } from '../state'
@@ -93,6 +94,11 @@ export function Family({ saved, lessons, onBack }: { saved: Saved; lessons: Reco
               <div className="mini">
                 {a.source} · {dateLabel(a.startedAt)} {clock(a.startedAt)}
               </div>
+              {lesson && (
+                <div className="mini">
+                  <Inline text={lesson.task} />
+                </div>
+              )}
               <ul className="log">
                 {a.stats.map((s, i) => (
                   <li key={i}>

@@ -134,3 +134,15 @@ button { font: inherit; color: inherit; }
 .icon-btn { width: 40px; height: 40px; border: 2px solid var(--line); border-radius: 10px; background: var(--bg); font-size: 1.1rem; font-weight: 700; cursor: pointer; }
 .icon-btn:disabled { opacity: .35; cursor: not-allowed; }
 .undo { width: auto; }
+
+.text-in { width: 100%; max-width: 260px; font: 700 1.15rem var(--body); padding: 8px 10px; border: 2px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--ink); }
+.task-card { background: var(--paper); border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; }
+.task-card summary { font-weight: 700; cursor: pointer; }
+.task-card p { margin: 8px 0 0; }
+.wait { display: grid; gap: 6px; }
+.wait-bar { height: 10px; border-radius: 5px; background: var(--line); overflow: hidden; }
+.wait-bar i { display: block; height: 100%; background: var(--calm); transition: width 1s linear; }
+.topic-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: stretch; }
+.topic-row .card.tap { align-content: center; }
+.pick-btn { border: 2px solid var(--line); background: var(--bg); border-radius: 12px; padding: 6px 10px; font-weight: 700; font-size: .8rem; color: var(--accent); cursor: pointer; min-width: 92px; }
+.pick-btn[aria-pressed=true] { border-color: var(--accent); background: var(--accent-soft); }

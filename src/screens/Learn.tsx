@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Pizza } from '../components/Art'
 import { Frac, Inline, Rich } from '../components/Rich'
 import { HenniSays, Ladder, Screen } from '../components/Ui'
@@ -7,14 +7,16 @@ import { checkAnswer, type CheckResult } from '../logic/check'
 import type { Farm, Lesson, Step, VersionKey } from '../types'
 import { VERSION_LABEL } from '../types'
 
-export function Camera({ onPhoto, onBack }: { onPhoto: (url: string) => void; onBack: () => void }) {
+export function Camera({ onPhoto, onBack }: { onPhoto: (file: File) => void; onBack: () => void }) {
+  const [file, setFile] = useState<File | null>(null)
   const [url, setUrl] = useState<string | null>(null)
+  useEffect(() => () => void (url && URL.revokeObjectURL(url)), [url])
   return (
     <Screen
       foot={
         <>
           {url ? (
-            <button className="btn" onClick={() => onPhoto(url)}>
+            <button className="btn" onClick={() => file && onPhoto(file)}>
               Foto verwenden
             </button>
           ) : (
@@ -38,13 +40,66 @@ export function Camera({ onPhoto, onBack }: { onPhoto: (url: string) => void; on
         hidden
         onChange={(e) => {
           const f = e.target.files?.[0]
-          if (f) setUrl(URL.createObjectURL(f))
+          if (f) {
+            setFile(f)
+            setUrl(URL.createObjectURL(f))
+          }
+          e.target.value = ''
         }}
       />
       {url ? <img className="photo-prev" src={url} alt="Dein Foto" /> : <div className="viewfinder">Hier erscheint dein Foto.</div>}
-      <div className="note-box">
-        <b>Testversion:</b> Das Foto wird noch nicht ausgewertet. Danach startet immer die Beispielaufgabe mit der Pizza. Das Lesen des Fotos kommt mit der KI.
+      <p className="mini">Danach liest Henni die Aufgabe. Das dauert ungefähr eine Minute.</p>
+    </Screen>
+  )
+}
+
+// Wartebildschirm, solange die KI den Lernpfad erstellt. Die Sekunden zeigen, dass etwas passiert.
+export function Waiting({ text, onCancel }: { text: string; onCancel: () => void }) {
+  const [seconds, setSeconds] = useState(0)
+  useEffect(() => {
+    const t = setInterval(() => setSeconds((s) => s + 1), 1000)
+    return () => clearInterval(t)
+  }, [])
+  return (
+    <Screen
+      foot={
+        <button className="btn sec" onClick={onCancel}>
+          Abbrechen
+        </button>
+      }
+    >
+      <HenniSays big>
+        <div className="s-title small">{text}</div>
+        <div>Ich bereite die Schritte für dich vor. Das dauert meistens ein bis zwei Minuten.</div>
+      </HenniSays>
+      <div className="wait" role="status">
+        <div className="wait-bar" aria-hidden="true">
+          <i style={{ width: `${Math.min(95, (seconds / 90) * 100)}%` }} />
+        </div>
+        <span className="mini">Schon {seconds} Sekunden.</span>
       </div>
+    </Screen>
+  )
+}
+
+export function Problem({ text, retry, onRetry, onBack }: { text: string; retry: string; onRetry: () => void; onBack: () => void }) {
+  return (
+    <Screen
+      foot={
+        <>
+          <button className="btn" onClick={onRetry}>
+            {retry}
+          </button>
+          <button className="btn sec" onClick={onBack}>
+            Zurück
+          </button>
+        </>
+      }
+    >
+      <HenniSays big>
+        <div className="s-title small">Das hat nicht geklappt.</div>
+        <div>{text}</div>
+      </HenniSays>
     </Screen>
   )
 }
@@ -106,6 +161,26 @@ function CheckBox({ step, result, onResult }: { step: Step; result: CheckResult 
         </div>
       )}
       {c.type === 'number' && <div>{num(0, 'Zahl')}</div>}
+      {c.type === 'value' && (
+        <form
+          className="eq"
+          onSubmit={(e) => {
+            e.preventDefault()
+            submit()
+          }}
+        >
+          <input
+            className="text-in"
+            aria-label="Deine Antwort"
+            inputMode={c.answers.every((a) => /^-?[\d\s.,]+$/.test(a)) ? 'decimal' : 'text'}
+            autoComplete="off"
+            autoCapitalize="off"
+            spellCheck={false}
+            value={vals[0] ?? ''}
+            onChange={(e) => set(0, e.target.value)}
+          />
+        </form>
+      )}
       {c.type === 'numerators' && (
         <div className="eq">
           {c.fractions.map(([z, n], i) => (
@@ -142,14 +217,16 @@ interface StepProps {
   onAgain: () => void
   onResult: (r: CheckResult) => void
   onNext: () => void
+  onStop: () => void
 }
 
-export function StepScreen({ lesson, index, version, result, onAgain, onResult, onNext }: StepProps) {
+export function StepScreen({ lesson, index, version, result, onAgain, onResult, onNext, onStop }: StepProps) {
   const step = lesson.steps[index]
   const v = step.versions[version]
   const [term, setTerm] = useState<string | null>(null)
   const last = index === lesson.steps.length - 1
   const ok = result?.status === 'ok'
+  const glossary = { ...GLOSSARY, ...lesson.glossary }
   return (
     <Screen
       foot={
@@ -159,6 +236,9 @@ export function StepScreen({ lesson, index, version, result, onAgain, onResult, 
           </button>
           <button className="btn" onClick={onNext} disabled={!ok}>
             {last ? 'Fertig' : `Weiter zu Schritt ${index + 2}`}
+          </button>
+          <button className="link" onClick={onStop}>
+            Aufhören und zur Startseite
           </button>
         </>
       }
@@ -171,6 +251,10 @@ export function StepScreen({ lesson, index, version, result, onAgain, onResult, 
       <div className="plabel">
         Schritt {index + 1} von {lesson.steps.length}
       </div>
+      <details className="task-card" open={index === 0}>
+        <summary>Die Aufgabe</summary>
+        <Rich text={lesson.task} />
+      </details>
       <div className="s-title">{step.title}</div>
       <HenniSays>
         <span className="vlabel">
@@ -190,9 +274,9 @@ export function StepScreen({ lesson, index, version, result, onAgain, onResult, 
           <Rich text={v.text} onTerm={(t) => setTerm(term === t ? null : t)} />
         </div>
       </HenniSays>
-      {term && GLOSSARY[term] && (
+      {term && glossary[term] && (
         <div className="gloss">
-          <b>{term}:</b> {GLOSSARY[term]}
+          <b>{term}:</b> {glossary[term]}
         </div>
       )}
       <div className="why">
