@@ -1,5 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk'
-import type { Check, Lesson, Step } from '../src/types'
+import type { Check, Lesson, Step } from '../src/types.js'
 
 // Erstellt einen Lernpfad mit Claude: aus Luisas Foto, aus einem Thema oder aus einer Übungsaufgabe.
 // Der Wächter (findLeaks) prüft danach, dass kein Ergebnis in den Erklärungen steht.
@@ -159,7 +159,7 @@ const contains = (text: string, answer: string) => {
 
 export function findLeaks(ai: AiLesson): string[] {
   const leaks: string[] = []
-  const finals = [ai.final_result, ...(ai.steps.at(-1)?.check.answers ?? [])].map(guarded).filter((a): a is string => !!a)
+  const finals = [ai.final_result, ...(ai.steps[ai.steps.length - 1]?.check.answers ?? [])].map(guarded).filter((a): a is string => !!a)
   ai.steps.forEach((s, i) => {
     const seen = [s.worte, s.bild, s.regel, s.why, s.check.question, s.check.hint]
     const own = s.check.kind === 'choice' ? [] : s.check.answers.map(guarded).filter((a): a is string => !!a)
@@ -236,18 +236,25 @@ export function toLesson(ai: AiLesson, id: string): Lesson {
 
 const MODEL = 'claude-opus-5-5'
 
-async function ask(client: Anthropic, messages: Anthropic.Beta.BetaMessageParam[]) {
-  const message = await client.beta.messages
+function send(client: Anthropic, messages: Anthropic.Beta.BetaMessageParam[], withFallback: boolean) {
+  return client.beta.messages
     .stream({
       model: MODEL,
       max_tokens: 32000,
-      betas: ['server-side-fallback-2026-07-01'],
-      fallbacks: 'default',
+      ...(withFallback ? { betas: ['server-side-fallback-2026-07-01'], fallbacks: 'default' as const } : {}),
       output_config: { effort: 'medium', format: { type: 'json_schema', schema: OUTPUT_SCHEMA } },
       system: SYSTEM_PROMPT,
       messages,
     })
     .finalMessage()
+}
+
+async function ask(client: Anthropic, messages: Anthropic.Beta.BetaMessageParam[]) {
+  // Ersatzmodell bei Ablehnung; lehnt das Konto diese Einstellung ab, geht es ohne weiter
+  const message = await send(client, messages, true).catch((e) => {
+    if (e instanceof Anthropic.BadRequestError && /fallback/i.test(e.message)) return send(client, messages, false)
+    throw e
+  })
   if (message.stop_reason === 'refusal') throw new Error('Die KI hat diese Aufgabe abgelehnt.')
   if (message.stop_reason === 'max_tokens') throw new Error('Der Lernpfad wurde zu lang.')
   const text = message.content.flatMap((b) => (b.type === 'text' ? [b.text] : [])).join('')
@@ -287,6 +294,15 @@ function parseRequest(body: unknown): LessonRequest | null {
 
 const json = (data: unknown, status = 200) => Response.json(data, { status })
 
+// Kurze technische Angabe für die Eltern, damit man den Grund ohne Server-Logs sieht
+function detailOf(e: unknown): string {
+  if (e instanceof Anthropic.APIError) {
+    const body = e.error as { error?: { type?: string; message?: string } } | undefined
+    return `Anthropic ${e.status ?? '?'}: ${body?.error?.message ?? e.message}`.slice(0, 300)
+  }
+  return e instanceof Error ? e.message.slice(0, 300) : String(e)
+}
+
 export async function POST(request: Request): Promise<Response> {
   if (!process.env.ANTHROPIC_API_KEY) {
     return json({ error: 'Die KI ist noch nicht eingerichtet. Ein Elternteil muss den Schlüssel bei Vercel eintragen.' }, 503)
@@ -298,6 +314,6 @@ export async function POST(request: Request): Promise<Response> {
   } catch (e) {
     console.error(e)
     const text = e instanceof Anthropic.APIError ? 'Die KI ist gerade nicht erreichbar.' : e instanceof Error ? e.message : 'Unbekannter Fehler.'
-    return json({ error: `${text} Bitte versuche es gleich noch einmal.` }, 502)
+    return json({ error: `${text} Bitte versuche es gleich noch einmal.`, detail: detailOf(e) }, 502)
   }
 }

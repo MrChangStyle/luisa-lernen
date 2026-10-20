@@ -55,7 +55,7 @@ export default function App() {
   const [reward, setReward] = useState<string[]>([])
   const [lessonId, setLessonId] = useState<string>(SAMPLE_LESSON.id)
   const [job, setJob] = useState<Job | null>(null)
-  const [problem, setProblem] = useState<{ text: string; retry: 'again' | 'photo' } | null>(null)
+  const [problem, setProblem] = useState<{ text: string; retry: 'again' | 'photo'; detail?: string } | null>(null)
   const [practiceKey, setPracticeKey] = useState<string | null>(null)
   const abort = useRef<AbortController | null>(null)
 
@@ -99,7 +99,7 @@ export default function App() {
         setProblem({ text: answer.problem, retry: 'photo' })
         setScreen('problem')
       } else {
-        setProblem({ text: answer.error, retry: 'again' })
+        setProblem({ text: answer.error, retry: 'again', detail: answer.detail })
         setScreen('problem')
       }
     } catch {
@@ -223,6 +223,7 @@ export default function App() {
       return (
         <Problem
           text={problem?.text ?? ''}
+          detail={problem?.detail}
           retry={problem?.retry === 'photo' ? 'Neues Foto machen' : 'Nochmal versuchen'}
           onRetry={() => (problem?.retry === 'photo' ? setScreen('camera') : job && run(job))}
           onBack={() => setScreen(job?.back === 'camera' ? 'home' : (job?.back ?? 'home'))}
