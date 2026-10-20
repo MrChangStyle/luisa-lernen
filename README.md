@@ -36,13 +36,23 @@ Die ganze App ist mit einem Familien-Passwort geschützt (`middleware.ts`). Ohne
 
 Jedes Gerät meldet sich einmal an und bleibt ein Jahr angemeldet. Wer das Passwort in Vercel ändert, meldet damit alle Geräte ab.
 
+## Cloud einrichten
+
+Alle Daten (Aufgaben, Antworten, Bauernhof, Stimmung, Protokoll) liegen in Supabase in Frankfurt (Projekt `luisa-lernen`, Tabelle `family_data`). Die App spricht nur über `api/data.ts` mit der Datenbank; der Schlüssel bleibt auf dem Server.
+
+1. In Supabase im Projekt **luisa-lernen** unter **Project Settings → API Keys** bei „Secret keys“ den Schlüssel (`sb_secret_…`) kopieren.
+2. In Vercel unter **Settings → Environment Variables** den Namen `SUPABASE_SECRET_KEY` mit diesem Schlüssel eintragen.
+3. Unter **Deployments** beim neuesten Eintrag „Redeploy“ wählen.
+
+Beim ersten Öffnen lädt jedes Gerät seinen bisherigen Stand hoch; die Stände werden zusammengeführt, nichts geht verloren. Der Familienbereich zeigt, ob alles in der Cloud gespeichert ist.
+
 ## Stand
 
 - Foto: Henni liest die Aufgabe und fragt „Ist das die richtige Aufgabe?“. Ist das Foto unlesbar, sagt Henni, was Luisa tun kann.
 - Meine Übungen: Ein Tipp auf ein Thema startet sofort eine neue Aufgabe dazu. „+ Auswahl“ legt das Thema in „Meine Auswahl“; dort startet ein Tipp ebenfalls sofort. Offene Übungen starten auch mit einem Tipp.
-- Alles wird nur auf dem Gerät gespeichert (localStorage). Die Eltern-PIN schützt nur vor versehentlichem Öffnen.
+- Alles liegt in der Cloud und zusätzlich als Kopie auf dem Gerät. Die Eltern-PIN schützt nur vor versehentlichem Öffnen.
 
 ## Nächste Schritte
 
-1. Familien-Datenbank (z. B. Supabase, EU): Konten für Luisa, Mama und Papa, Verlauf auf allen Geräten.
+1. Eigene Konten für Luisa, Mama und Papa statt eines Familien-Passworts.
 2. Antworten auf dem Server prüfen, damit keine Lösung im Handy liegt.
