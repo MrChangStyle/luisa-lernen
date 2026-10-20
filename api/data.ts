@@ -1,5 +1,5 @@
 import { mergeSaved } from '../src/logic/merge.js'
-import type { Saved } from '../src/state.js'
+import type { Saved } from '../src/types.js'
 
 // Cloud-Speicher der Familie in Supabase (EU, Frankfurt). Alle Geräte lesen und schreiben denselben Stand.
 // Die Middleware lässt nur angemeldete Geräte bis hierher. Der geheime Schlüssel bleibt auf dem Server.

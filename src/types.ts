@@ -80,3 +80,33 @@ export interface StepStat {
   wrong: string[]
   helped: VersionKey | null
 }
+
+// Alles, was gespeichert bleibt (Cloud und Kopie auf dem Gerät). Logik dazu in state.ts und logic/merge.ts.
+export interface Attempt {
+  id: string
+  lessonId: string
+  subject: string
+  topic: string
+  source: string
+  startedAt: string
+  finishedAt: string | null
+  stats: StepStat[]
+  // true, wenn die Aufgabe von Luisas Foto stammt
+  photo?: boolean
+  // gesetzt, wenn die Eltern die Aufgabe zurückgesetzt haben; sie bleibt im Archiv
+  archivedAt?: string | null
+}
+
+export interface Saved {
+  farm: Farm
+  // egg: Luisa hat die Stimmung an diesem Tag selbst bestätigt und dafür ein Ei bekommen
+  mood: Record<string, { value: number; at: string; egg?: boolean }>
+  selection: string[]
+  attempts: Attempt[]
+  events: LogEvent[]
+  parentPin: string | null
+  // Lernpfade, die die KI erstellt hat. Werden nie gelöscht, auch nicht nach dem Zurücksetzen.
+  lessons: Record<string, Lesson>
+  // Übungen aus „Offene Übungen“, die Luisa schon fertig gemacht hat: "lessonId#nummer"
+  donePractice: string[]
+}

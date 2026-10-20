@@ -1,38 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
-import type { Farm, Lesson, LogEvent, StepStat } from './types'
+import type { Lesson, Saved } from './types'
 import { EMPTY_FARM } from './logic/farm'
 import { mergeSaved } from './logic/merge'
 
 // Alles, was gespeichert bleibt. Der Stand liegt in der Cloud (api/data.ts, Supabase EU), damit Luisa
 // und beide Eltern auf jedem Gerät dasselbe sehen. Eine Kopie bleibt auf dem Gerät für Funklöcher.
-export interface Attempt {
-  id: string
-  lessonId: string
-  subject: string
-  topic: string
-  source: string
-  startedAt: string
-  finishedAt: string | null
-  stats: StepStat[]
-  // true, wenn die Aufgabe von Luisas Foto stammt
-  photo?: boolean
-  // gesetzt, wenn die Eltern die Aufgabe zurückgesetzt haben; sie bleibt im Archiv
-  archivedAt?: string | null
-}
-
-export interface Saved {
-  farm: Farm
-  // egg: Luisa hat die Stimmung an diesem Tag selbst bestätigt und dafür ein Ei bekommen
-  mood: Record<string, { value: number; at: string; egg?: boolean }>
-  selection: string[]
-  attempts: Attempt[]
-  events: LogEvent[]
-  parentPin: string | null
-  // Lernpfade, die die KI erstellt hat. Werden nie gelöscht, auch nicht nach dem Zurücksetzen.
-  lessons: Record<string, Lesson>
-  // Übungen aus „Offene Übungen“, die Luisa schon fertig gemacht hat: "lessonId#nummer"
-  donePractice: string[]
-}
+export type { Attempt, Saved } from './types'
 
 const KEY = 'luisa-lernen:v1'
 
