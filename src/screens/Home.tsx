@@ -5,11 +5,13 @@ import { moodText } from '../logic/mood'
 interface Props {
   mood: number
   moodSavedAt: string | null
+  moodEgg: boolean
   onMood: (v: number) => void
+  onConfirmMood: () => void
   go: (s: 'camera' | 'practice' | 'farm' | 'family') => void
 }
 
-export function Home({ mood, moodSavedAt, onMood, go }: Props) {
+export function Home({ mood, moodSavedAt, moodEgg, onMood, onConfirmMood, go }: Props) {
   return (
     <Screen
       foot={
@@ -46,7 +48,16 @@ export function Home({ mood, moodSavedAt, onMood, go }: Props) {
           <span>schlecht</span>
           <span>sehr gut</span>
         </div>
-        {moodSavedAt && <div className="mini">✓ Deine Stimmung für heute ist gespeichert ({moodSavedAt}).</div>}
+        {moodEgg ? (
+          <div className="mini">✓ Stimmung bestätigt ({moodSavedAt}). Du hast 1 Ei bekommen.</div>
+        ) : (
+          <>
+            <button type="button" className="btn sec slim mood-ok" onClick={onConfirmMood}>
+              Stimmung bestätigen · 1 Ei verdienen
+            </button>
+            {moodSavedAt && <div className="mini">✓ Deine Stimmung für heute ist gespeichert ({moodSavedAt}).</div>}
+          </>
+        )}
         {mood < 30 && <div className="mini">Wenn du möchtest, mach zuerst eine kurze Pause. Du kannst auch mit einer leichten Übung anfangen.</div>}
       </section>
     </Screen>

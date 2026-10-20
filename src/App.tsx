@@ -78,6 +78,19 @@ export default function App() {
     setSaved((s) => withEvent({ ...s, mood: { ...s.mood, [today]: { value: mood, at } } }, `Stimmung des Tages gespeichert: „${moodText(mood)}“`))
   }
 
+  // Einmal am Tag: Stimmung selbst bestätigen gibt 1 Ei
+  const confirmMood = () => {
+    if (todayMood?.egg) return
+    const { farm, messages } = addEgg(saved.farm)
+    const at = new Date().toISOString()
+    setSaved((s) =>
+      withEvent(
+        { ...s, farm, mood: { ...s.mood, [today]: { value: mood, at, egg: true } } },
+        `Stimmung bestätigt: „${moodText(mood)}“, 1 Ei bekommen${messages.length ? '. ' + messages.join(' ') : ''}`,
+      ),
+    )
+  }
+
   const updateAttempt = (fn: (a: Attempt) => Attempt) =>
     setSaved((s) => ({ ...s, attempts: s.attempts.map((a) => (a.id === attemptId ? fn(a) : a)) }))
 
@@ -215,6 +228,8 @@ export default function App() {
         <Home
           mood={mood}
           moodSavedAt={todayMood ? clock(todayMood.at) : null}
+          moodEgg={!!todayMood?.egg}
+          onConfirmMood={confirmMood}
           onMood={(v) => {
             setMood(v)
             setMoodTouched(true)
