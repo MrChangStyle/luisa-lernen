@@ -1,7 +1,9 @@
-import { useState, type ReactNode } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import { Face } from '../components/Art'
 import { Inline } from '../components/Rich'
 import { Ladder, Screen } from '../components/Ui'
+import { MoodLine, TaskBars } from '../components/Charts'
+import { parsePeriod, periodKey, periodLabel, periodOptions, summarize } from '../logic/stats'
 import { dayKey, moodText } from '../logic/mood'
 import { clock, dateLabel, type CloudState, type Saved } from '../state'
 import type { Lesson } from '../types'
@@ -89,13 +91,14 @@ export function Family({ saved, cloud, lessons, onArchive, onRestore, onBack }: 
   const card = (a: Saved['attempts'][number], action: ReactNode) => {
     const lesson = lessons[a.lessonId]
     return (
-      <section key={a.id} className="card stack">
-        <div className="row-between">
-          <b>
+      <details key={a.id} className="fold">
+        <summary>
+          <span>
             {a.subject} · {a.topic}
-          </b>
+          </span>
           <span className={`pill ${a.finishedAt ? 'ok' : 'mid'}`}>{a.finishedAt ? 'fertig' : 'angefangen'}</span>
-        </div>
+        </summary>
+        <section className="card stack">
         <div className="mini">
           {a.source} · {dateLabel(a.startedAt)} {clock(a.startedAt)}
           {a.archivedAt && ` · archiviert am ${dateLabel(a.archivedAt)}`}
@@ -127,12 +130,17 @@ export function Family({ saved, cloud, lessons, onArchive, onRestore, onBack }: 
           </div>
         )}
         {action}
-      </section>
+        </section>
+      </details>
     )
   }
   const today = dayKey(new Date())
   const todayMood = saved.mood[today]
-  const week = Object.entries(saved.mood).sort().slice(-7)
+  const options = useMemo(() => periodOptions(saved), [saved])
+  const [periodSel, setPeriodSel] = useState(periodKey(options[0]))
+  const period = parsePeriod(periodSel)
+  const sum = summarize(saved, period)
+  const avg = period.kind !== 'week'
   return (
     <Screen
       foot={
@@ -156,58 +164,105 @@ export function Family({ saved, cloud, lessons, onArchive, onRestore, onBack }: 
         {todayMood ? <Face value={todayMood.value} size={56} /> : <span className="mini">–</span>}
         <div>
           <b>Stimmung heute:</b> {todayMood ? `${moodText(todayMood.value)} (${clock(todayMood.at)})` : 'noch nicht eingetragen'}
-          {week.length > 0 && (
-            <div className="mini">
-              Letzte Tage: {week.map(([d, m]) => `${dateLabel(d)} ${moodText(m.value).replace('Mir geht es ', '').replace('.', '')}`).join(' · ')}
-            </div>
-          )}
         </div>
+      </section>
+      <section className="card dash">
+        <b>Übersicht</b>
+        <select aria-label="Zeitraum" value={periodSel} onChange={(e) => setPeriodSel(e.target.value)}>
+          <optgroup label="Wochen">
+            {options.filter((o) => o.kind === 'week').map((o) => (
+              <option key={periodKey(o)} value={periodKey(o)}>
+                {periodLabel(o)}
+              </option>
+            ))}
+          </optgroup>
+          <optgroup label="Monate">
+            {options.filter((o) => o.kind === 'month').map((o) => (
+              <option key={periodKey(o)} value={periodKey(o)}>
+                {periodLabel(o)}
+              </option>
+            ))}
+          </optgroup>
+          <option value="all">Gesamte Zeit</option>
+        </select>
+        <div className="tiles">
+          <div className="tile">
+            <b>{sum.tasks}</b>
+            <span>Aufgaben fertig</span>
+          </div>
+          <div className="tile">
+            <b>{sum.minutes >= 60 ? `${Math.floor(sum.minutes / 60)} h ${sum.minutes % 60}` : sum.minutes} min</b>
+            <span>Lernzeit</span>
+          </div>
+          <div className="tile">
+            <b>{sum.mood === null ? '–' : moodText(sum.mood).replace('Mir geht es ', '').replace('.', '')}</b>
+            <span>Ø Stimmung ({sum.moodDays} {sum.moodDays === 1 ? 'Tag' : 'Tage'})</span>
+          </div>
+        </div>
+        <TaskBars key={`t${periodSel}`} days={sum.days} avg={avg} />
+        <MoodLine key={`m${periodSel}`} days={sum.days} avg={avg} />
+        <span className="mini">Lernzeit zählt die Zeit vom Start bis zum Fertigmachen einer Aufgabe, höchstens 60 Minuten je Aufgabe.</span>
       </section>
       <section className="card stack">
         <b>Luisas Bauernhof</b>
         <Ladder farm={saved.farm} />
       </section>
-      <div className="s-title small">Aufgaben</div>
-      {current.length === 0 && <p className="mini">Keine aktuellen Aufgaben.</p>}
-      {current.length > 1 &&
-        ask(
-          'alle',
-          `Wirklich alle ${current.length} Aufgaben zurücksetzen?`,
-          current.map((a) => a.id),
-        )}
-      {current
-        .slice()
-        .reverse()
-        .map((a) => card(a, ask(a.id, `„${a.topic}“ wirklich zurücksetzen?`, [a.id])))}
-      <details className="archive">
+      <details className="fold">
         <summary>
-          Archiv ({archived.length} {archived.length === 1 ? 'Aufgabe' : 'Aufgaben'})
+          <span>Aufgaben</span>
+          <span className="pill idle">{current.length}</span>
         </summary>
-        {archived.length === 0 && <p className="mini">Zurückgesetzte Aufgaben landen hier. Sie werden nie gelöscht.</p>}
-        {archived
-          .slice()
-          .sort((x, y) => (y.archivedAt ?? '').localeCompare(x.archivedAt ?? ''))
-          .map((a) =>
-            card(
-              a,
-              <button className="btn sec slim" onClick={() => onRestore(a.id)}>
-                Zurückholen
-              </button>,
-            ),
+        {current.length === 0 && <p className="mini">Keine aktuellen Aufgaben.</p>}
+        {current.length > 1 &&
+          ask(
+            'alle',
+            `Wirklich alle ${current.length} Aufgaben zurücksetzen?`,
+            current.map((a) => a.id),
           )}
-      </details>
-      <div className="s-title small">Verlauf</div>
-      <ul className="log">
-        {saved.events
-          .slice(-40)
+        {current
+          .slice()
           .reverse()
-          .map((e, i) => (
-            <li key={i}>
-              <span>{clock(e.at)}</span>
-              <span>{e.text}</span>
-            </li>
-          ))}
-      </ul>
+          .map((a) => card(a, ask(a.id, `„${a.topic}“ wirklich zurücksetzen?`, [a.id])))}
+        <details className="fold">
+          <summary>
+            <span>Archiv</span>
+            <span className="pill idle">{archived.length}</span>
+          </summary>
+          {archived.length === 0 && <p className="mini">Zurückgesetzte Aufgaben landen hier. Sie werden nie gelöscht.</p>}
+          {archived
+            .slice()
+            .sort((x, y) => (y.archivedAt ?? '').localeCompare(x.archivedAt ?? ''))
+            .map((a) =>
+              card(
+                a,
+                <button className="btn sec slim" onClick={() => onRestore(a.id)}>
+                  Zurückholen
+                </button>,
+              ),
+            )}
+        </details>
+      </details>
+      <details className="fold">
+        <summary>
+          <span>Verlauf</span>
+          <span className="pill idle">{saved.events.length}</span>
+        </summary>
+        <ul className="log">
+          {saved.events
+            .slice(-60)
+            .reverse()
+            .map((e, i) => (
+              <li key={i}>
+                <span>
+                  {dateLabel(e.at)}
+                  <br />
+                  {clock(e.at)}
+                </span>
+                <span>{e.text}</span>
+              </li>
+            ))}
+        </ul>
+      </details>
     </Screen>
   )
 }
