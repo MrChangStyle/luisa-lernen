@@ -21,7 +21,8 @@ export interface Attempt {
 
 export interface Saved {
   farm: Farm
-  mood: Record<string, { value: number; at: string }>
+  // egg: Luisa hat die Stimmung an diesem Tag selbst bestätigt und dafür ein Ei bekommen
+  mood: Record<string, { value: number; at: string; egg?: boolean }>
   selection: string[]
   attempts: Attempt[]
   events: LogEvent[]
