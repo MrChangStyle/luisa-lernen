@@ -128,4 +128,7 @@ export interface Saved {
   donePractice: string[]
   // Gescannte Seiten, damit eine Aufgabe von dort nicht noch einmal gelesen werden muss
   pages: Record<string, Page>
+  // Kennung des Neustarts (ISO-Zeit). Nach einem Zurücksetzen der Familie gewinnt der neuere Neustart ganz,
+  // damit Geräte mit altem Stand die gelöschten Daten nicht wieder hochladen.
+  start?: string
 }

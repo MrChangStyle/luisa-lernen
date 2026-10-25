@@ -42,4 +42,12 @@ describe('Cloud: Stände zusammenführen', () => {
     expect(m.pages.P1.tasks.map((t) => t.lessonId)).toEqual(['L1', 'L2'])
     expect(Object.keys(m.pages).sort()).toEqual(['P1', 'P2'])
   })
+  it('übernimmt nach einem Neustart nichts aus dem alten Stand', () => {
+    const alt: Saved = { ...empty, farm: { ...empty.farm, chick: 3 }, attempts: [attempt('a1', 'L1', '2026-10-20T10:05:00Z')], lessons: { L1: { ...SAMPLE_LESSON, id: 'L1' } } }
+    const neu: Saved = { ...empty, parentPin: '1234', start: '2026-10-25T12:00:00Z' }
+    expect(mergeSaved(neu, alt)).toBe(neu)
+    expect(mergeSaved(alt, neu)).toBe(neu)
+    const weiter: Saved = { ...neu, attempts: [attempt('a2', 'L2', null)] }
+    expect(mergeSaved(neu, weiter).attempts.map((a) => a.id)).toEqual(['a2'])
+  })
 })

@@ -37,6 +37,8 @@ function mergePage(old: Page, next: Page): Page {
 }
 
 export function mergeSaved(old: Saved, next: Saved): Saved {
+  // Verschiedene Neustarts: der Stand vor dem Zurücksetzen fällt komplett weg
+  if ((old.start ?? '') !== (next.start ?? '')) return (old.start ?? '') > (next.start ?? '') ? old : next
   const attempts = new Map(old.attempts.map((a) => [a.id, a]))
   for (const a of next.attempts) attempts.set(a.id, attempts.has(a.id) ? mergeAttempt(attempts.get(a.id)!, a) : a)
 
