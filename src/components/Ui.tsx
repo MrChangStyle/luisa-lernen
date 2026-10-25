@@ -7,7 +7,11 @@ import type { Farm } from '../types'
 // top: ändert sich der Wert (z. B. neuer Schritt), beginnt die Ansicht wieder ganz oben
 export function Screen({ children, foot, top }: { children: ReactNode; foot?: ReactNode; top?: string }) {
   const view = useRef<HTMLElement>(null)
-  useEffect(() => view.current?.scrollTo({ top: 0 }), [top])
+  // In geschweiften Klammern: Neuere Browser geben bei scrollTo ein Promise zurück, das React sonst
+  // beim Verlassen der Seite als Aufräum-Funktion aufrufen würde („… is not a function“)
+  useEffect(() => {
+    view.current?.scrollTo({ top: 0 })
+  }, [top])
   return (
     <div className="screen">
       <main className="view" ref={view}>
