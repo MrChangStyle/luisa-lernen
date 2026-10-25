@@ -3,7 +3,7 @@ import { Inline } from '../components/Rich'
 import { move } from '../logic/selection'
 import { Screen } from '../components/Ui'
 import { SUBJECTS } from '../data/subjects'
-import type { Lesson } from '../types'
+import type { Lesson, Page } from '../types'
 import type { Attempt, LessonEntry } from '../state'
 
 interface MenuProps {
@@ -203,7 +203,9 @@ export function OpenScreen({ lessons, onStart, onBack }: { lessons: Lesson[]; on
   )
 }
 
-export function PhotosScreen({ attempts, onBack }: { attempts: Attempt[]; onBack: () => void }) {
+// Gescannte Seiten (tippen öffnet die Aufgabenliste, ohne dass die KI die Seite neu liest)
+// und ältere Foto-Aufgaben aus der Zeit vor dem Seiten-Scan
+export function PhotosScreen({ pages, attempts, onPage, onBack }: { pages: Page[]; attempts: Attempt[]; onPage: (p: Page) => void; onBack: () => void }) {
   return (
     <Screen
       foot={
@@ -213,7 +215,20 @@ export function PhotosScreen({ attempts, onBack }: { attempts: Attempt[]; onBack
       }
     >
       <div className="s-title">Aus meinen Fotos</div>
-      {attempts.length === 0 && <p className="mini">Du hast noch keine Aufgabe fotografiert.</p>}
+      {pages.length === 0 && attempts.length === 0 && <p className="mini">Du hast noch keine Seite fotografiert.</p>}
+      {pages.length > 0 && <p className="q">Meine Seiten</p>}
+      {pages.map((p) => (
+        <button key={p.id} className="card tap" onClick={() => onPage(p)}>
+          <span className="row-between">
+            <b>
+              {p.subject} · {p.title}
+            </b>
+            <span className="pill idle">{p.tasks.length === 1 ? '1 Aufgabe' : `${p.tasks.length} Aufgaben`}</span>
+          </span>
+          <span className="mini">{new Date(p.at).toLocaleDateString('de-DE')} · Tippen zum Auswählen</span>
+        </button>
+      ))}
+      {attempts.length > 0 && pages.length > 0 && <p className="q">Frühere Fotos</p>}
       {attempts
         .slice()
         .reverse()

@@ -1,5 +1,6 @@
 {
   "functions": {
-    "api/lesson.ts": { "maxDuration": 300 }
+    "api/lesson.ts": { "maxDuration": 300 },
+    "api/page.ts": { "maxDuration": 300 }
   }
 }

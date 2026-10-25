@@ -9,7 +9,7 @@ export type { Attempt, Saved } from './types'
 
 const KEY = 'luisa-lernen:v1'
 
-const initial: Saved = { farm: EMPTY_FARM, mood: {}, selection: [], attempts: [], events: [], parentPin: null, lessons: {}, donePractice: [] }
+const initial: Saved = { farm: EMPTY_FARM, mood: {}, selection: [], attempts: [], events: [], parentPin: null, lessons: {}, donePractice: [], pages: {} }
 
 function load(): Saved {
   try {

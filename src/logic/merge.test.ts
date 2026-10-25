@@ -3,7 +3,7 @@ import { farmFromTotal, farmTotal, mergeSaved } from './merge'
 import { SAMPLE_LESSON } from '../data/sampleLesson'
 import type { Saved } from '../state'
 
-const empty: Saved = { farm: { egg: 0, chick: 0, hen: 0, rooster: 0, cow: 0 }, mood: {}, selection: [], attempts: [], events: [], parentPin: null, lessons: {}, donePractice: [] }
+const empty: Saved = { farm: { egg: 0, chick: 0, hen: 0, rooster: 0, cow: 0 }, mood: {}, selection: [], attempts: [], events: [], parentPin: null, lessons: {}, donePractice: [], pages: {} }
 const attempt = (id: string, lessonId: string, finishedAt: string | null) => ({ id, lessonId, subject: 'Mathe', topic: 'T', source: 'Übung', startedAt: '2026-10-20T10:00:00Z', finishedAt, stats: [] })
 
 describe('Cloud: Stände zusammenführen', () => {
@@ -32,5 +32,14 @@ describe('Cloud: Stände zusammenführen', () => {
     const a = mergeSaved(old, next).attempts[0]
     expect(a.finishedAt).toBe('2026-10-20T10:05:00Z')
     expect(a.archivedAt).toBe('2026-10-21T08:00:00Z')
+  })
+  it('behält gescannte Seiten und schon erstellte Lernpfade pro Aufgabe', () => {
+    const task = (label: string) => ({ label, topic: 'Brüche', text: 'Kürze {4/8}.' })
+    const page = { id: 'P1', at: '2026-10-25T10:00:00Z', subject: 'Mathe', title: 'Seite 42', tasks: [task('Aufgabe 1'), task('Aufgabe 2')] }
+    const old: Saved = { ...empty, pages: { P1: { ...page, tasks: [{ ...task('Aufgabe 1'), lessonId: 'L1' }, task('Aufgabe 2')] } } }
+    const next: Saved = { ...empty, pages: { P1: { ...page, tasks: [task('Aufgabe 1'), { ...task('Aufgabe 2'), lessonId: 'L2' }] }, P2: { ...page, id: 'P2' } } }
+    const m = mergeSaved(old, next)
+    expect(m.pages.P1.tasks.map((t) => t.lessonId)).toEqual(['L1', 'L2'])
+    expect(Object.keys(m.pages).sort()).toEqual(['P1', 'P2'])
   })
 })

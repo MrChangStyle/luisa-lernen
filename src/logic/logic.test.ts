@@ -66,6 +66,7 @@ describe('Aufgaben zurücksetzen', () => {
     parentPin: null,
     lessons: { L1: SAMPLE_LESSON, L2: SAMPLE_LESSON },
     donePractice: ['L1#x'],
+    pages: {},
   }
   const last = (s: Saved) => s.events[s.events.length - 1]?.text
   it('legt eine Aufgabe ins Archiv und löscht nichts', () => {
@@ -103,6 +104,7 @@ describe('Meine Aufgaben und Ei nur beim ersten Bestehen', () => {
     parentPin: null,
     lessons: { L1: L('L1'), L2: L('L2'), L3: L('L3') },
     donePractice: [],
+    pages: {},
   }
   it('zählt archivierte Versuche als bestanden, damit es kein zweites Ei gibt', () => {
     expect(passedBefore(s, 'L1', 'a3')).toBe(true)
