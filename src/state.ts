@@ -11,6 +11,9 @@ const KEY = 'luisa-lernen:v1'
 
 const initial: Saved = { farm: EMPTY_FARM, mood: {}, selection: [], attempts: [], events: [], parentPin: null, lessons: {}, donePractice: [], pages: {} }
 
+// Ergänzt fehlende Felder (z. B. aus einem älteren Stand), damit die Anzeige nie an einem leeren Feld scheitert
+const full = (s: Saved): Saved => ({ ...initial, ...s })
+
 function load(): Saved {
   try {
     const raw = localStorage.getItem(KEY)
@@ -62,7 +65,7 @@ export function useSaved() {
         setCloud(r)
       } else if (r.saved) {
         const fromCloud = r.saved
-        setSaved((cur) => mergeSaved(cur, { ...initial, ...fromCloud }))
+        setSaved((cur) => full(mergeSaved(cur, { ...initial, ...fromCloud })))
         setCloud('ok')
       }
       setReady(true)
@@ -87,7 +90,7 @@ export function useSaved() {
       }
       const fromCloud = r.saved ?? saved
       setSaved((cur) => {
-        const next = mergeSaved(fromCloud, cur)
+        const next = full(mergeSaved({ ...initial, ...fromCloud }, cur))
         // Nur als abgeglichen merken, wenn in der Zwischenzeit nichts Neues dazukam
         if (JSON.stringify(cur) === sent) synced.current = JSON.stringify(next)
         return next
