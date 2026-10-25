@@ -233,6 +233,7 @@ export function StepScreen({ lesson, index, version, results, onGoTo, onAgain, o
   const glossary = { ...GLOSSARY, ...lesson.glossary }
   return (
     <Screen
+      top={`${lesson.id}-${index}-${version}`}
       foot={
         <>
           <button className="btn calm" onClick={onAgain}>
