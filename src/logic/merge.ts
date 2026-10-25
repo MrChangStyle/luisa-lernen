@@ -1,4 +1,4 @@
-import type { Attempt, Farm, Saved } from '../types.js'
+import type { Attempt, Farm, Page, Saved } from '../types.js'
 
 // Führt zwei Stände zusammen, z. B. Handy und Tablet. Nichts geht verloren:
 // Aufgaben, Lernpfade, Stimmungen und Protokoll werden vereinigt, der Bauernhof wächst nur.
@@ -31,6 +31,11 @@ function mergeAttempt(old: Attempt, next: Attempt): Attempt {
   }
 }
 
+// Dieselbe Seite auf zwei Geräten: ein schon erstellter Lernpfad pro Aufgabe bleibt erhalten
+function mergePage(old: Page, next: Page): Page {
+  return { ...next, tasks: next.tasks.map((t, i) => ({ ...t, lessonId: t.lessonId ?? old.tasks[i]?.lessonId })) }
+}
+
 export function mergeSaved(old: Saved, next: Saved): Saved {
   const attempts = new Map(old.attempts.map((a) => [a.id, a]))
   for (const a of next.attempts) attempts.set(a.id, attempts.has(a.id) ? mergeAttempt(attempts.get(a.id)!, a) : a)
@@ -57,6 +62,9 @@ export function mergeSaved(old: Saved, next: Saved): Saved {
     ...next,
     attempts: [...attempts.values()].sort((a, b) => a.startedAt.localeCompare(b.startedAt)),
     lessons: { ...old.lessons, ...next.lessons },
+    pages: Object.fromEntries(
+      Object.entries({ ...old.pages, ...next.pages }).map(([id, p]) => [id, old.pages?.[id] && next.pages?.[id] ? mergePage(old.pages[id], next.pages[id]) : p]),
+    ),
     mood,
     events,
     donePractice: [...new Set([...old.donePractice, ...next.donePractice])],

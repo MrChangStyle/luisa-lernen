@@ -1,34 +1,37 @@
 import { useRef, useState } from 'react'
 import { SAMPLE_LESSON } from './data/sampleLesson'
-import { requestLesson, shrinkPhoto, type LessonAsk } from './logic/api'
+import { requestLesson, requestPage, shrinkPhoto, type LessonAsk } from './logic/api'
 import type { CheckResult } from './logic/check'
 import { addEgg } from './logic/farm'
 import { dayKey, moodText } from './logic/mood'
 import { Family, PinGate } from './screens/Family'
 import { FarmScreen } from './screens/Farm'
 import { Home } from './screens/Home'
-import { Camera, Confirm, Done, Problem, StepScreen, Waiting } from './screens/Learn'
+import { Camera, Done, Problem, StepScreen, Waiting } from './screens/Learn'
+import { PageScreen, type TaskStatus } from './screens/Page'
 import { SUBJECTS } from './data/subjects'
 import { LessonsScreen, OpenScreen, PhotosScreen, PracticeMenu, SelectionScreen, SubjectScreen } from './screens/Practice'
 import { archiveAttempts, clock, lessonOverview, passedBefore, restoreAttempt, useSaved, withEvent, withLesson, type Attempt } from './state'
-import { VERSION_LABEL, type Lesson } from './types'
+import { VERSION_LABEL, type Lesson, type Page } from './types'
 
 const subjectOf = (topic: string) => Object.keys(SUBJECTS).find((k) => SUBJECTS[k].some((t) => t.name === topic)) ?? 'Mathe'
 
 // Ein Auftrag an die KI: was sie erstellen soll und wohin es danach geht
+// page-file: Foto einer Seite, die KI listet nur die Aufgaben darauf. Sonst erstellt sie einen Lernpfad.
 interface Job {
-  ask: LessonAsk | { mode: 'photo-file'; file: File }
+  ask: LessonAsk | { mode: 'page-file'; file: File }
   how: string
   waitText: string
   back: ScreenName
-  confirm: boolean
   practiceKey?: string
+  // Aufgabe von einer gescannten Seite: der Lernpfad wird dort vermerkt
+  pageTask?: { pageId: string; index: number }
 }
 
 type ScreenName =
   | 'home'
   | 'camera'
-  | 'confirm'
+  | 'page'
   | 'step'
   | 'done'
   | 'waiting'
@@ -60,6 +63,7 @@ export default function App() {
   const [job, setJob] = useState<Job | null>(null)
   const [problem, setProblem] = useState<{ text: string; retry: 'again' | 'photo'; detail?: string } | null>(null)
   const [practiceKey, setPracticeKey] = useState<string | null>(null)
+  const [pageId, setPageId] = useState<string | null>(null)
   const abort = useRef<AbortController | null>(null)
 
   const lessons: Record<string, Lesson> = { [SAMPLE_LESSON.id]: SAMPLE_LESSON, ...saved.lessons }
@@ -97,7 +101,7 @@ export default function App() {
   const updateStat = (fn: (st: Attempt['stats'][number]) => Attempt['stats'][number]) =>
     updateAttempt((a) => ({ ...a, stats: a.stats.map((st, i) => (i === stepIndex ? fn(st) : st)) }))
 
-  // Lässt die KI einen Lernpfad erstellen. Bei einem Foto kommt danach die Frage „Ist das die richtige Aufgabe?“.
+  // Lässt die KI einen Lernpfad erstellen oder eine fotografierte Seite lesen
   const run = async (j: Job) => {
     abort.current?.abort()
     const ctrl = new AbortController()
@@ -105,16 +109,26 @@ export default function App() {
     setJob(j)
     setScreen('waiting')
     try {
-      const ask: LessonAsk = j.ask.mode === 'photo-file' ? { mode: 'photo', image: await shrinkPhoto(j.ask.file), mediaType: 'image/jpeg' } : j.ask
-      const answer = await requestLesson(ask, ctrl.signal)
+      const answer = j.ask.mode === 'page-file' ? await requestPage(await shrinkPhoto(j.ask.file), ctrl.signal) : await requestLesson(j.ask, ctrl.signal)
       if (ctrl.signal.aborted) return
-      if ('lesson' in answer) {
+      if ('page' in answer) {
+        const page: Page = { id: crypto.randomUUID(), at: new Date().toISOString(), ...answer.page }
+        setSaved((s) => withEvent({ ...s, pages: { ...s.pages, [page.id]: page } }, `Seite fotografiert: ${page.subject}, „${page.title}“ (${page.tasks.length} Aufgaben)`))
+        setPageId(page.id)
+        setScreen('page')
+      } else if ('lesson' in answer) {
         const l = answer.lesson
-        setSaved((s) => withLesson(s, l))
+        const pt = j.pageTask
+        setSaved((s) => {
+          const next = withLesson(s, l)
+          const page = pt && next.pages[pt.pageId]
+          if (!page) return next
+          const tasks = page.tasks.map((t, i) => (i === pt.index ? { ...t, lessonId: l.id } : t))
+          return { ...next, pages: { ...next.pages, [page.id]: { ...page, tasks } } }
+        })
         setLessonId(l.id)
         setPracticeKey(j.practiceKey ?? null)
-        if (j.confirm) setScreen('confirm')
-        else startLesson(l, j.how)
+        startLesson(l, j.how, !!pt)
       } else if ('problem' in answer) {
         setProblem({ text: answer.problem, retry: 'photo' })
         setScreen('problem')
@@ -129,13 +143,36 @@ export default function App() {
     }
   }
 
+  // Eine Aufgabe von einer gescannten Seite. Gibt es den Lernpfad schon, braucht es die KI nicht noch einmal.
+  const startPageTask = (page: Page, index: number) => {
+    const task = page.tasks[index]
+    const known = task.lessonId ? lessons[task.lessonId] : undefined
+    setPageId(page.id)
+    if (known) {
+      setLessonId(known.id)
+      setPracticeKey(null)
+      startLesson(known, passedBefore(saved, known.id) ? 'Aufgabe von der Seite wiederholt' : 'Aufgabe von der Seite weitergemacht', true)
+      return
+    }
+    run({
+      ask: { mode: 'task', subject: page.subject, topic: task.topic, text: task.text, source: `${page.title}, ${task.label}` },
+      how: 'Aufgabe von der Seite gewählt',
+      waitText: `Ich bereite „${task.label}“ vor.`,
+      back: 'page',
+      pageTask: { pageId: page.id, index },
+    })
+  }
+
+  const taskStatus = (page: Page): TaskStatus[] =>
+    page.tasks.map((t) => (!t.lessonId ? 'neu' : passedBefore(saved, t.lessonId) ? 'bestanden' : saved.attempts.some((a) => a.lessonId === t.lessonId) ? 'angefangen' : 'neu'))
+
   const cancel = () => {
     abort.current?.abort()
     setScreen(job?.back ?? 'home')
   }
 
   const startTopic = (subj: string, topic: string, back: ScreenName, how: string) =>
-    run({ ask: { mode: 'topic', subject: subj, topic }, how, waitText: `Ich denke mir eine Aufgabe zu „${topic}“ aus.`, back, confirm: false })
+    run({ ask: { mode: 'topic', subject: subj, topic }, how, waitText: `Ich denke mir eine Aufgabe zu „${topic}“ aus.`, back })
 
   const startLesson = (l: Lesson, how: string, photo = false) => {
     const id = crypto.randomUUID()
@@ -218,7 +255,12 @@ export default function App() {
     .map((l) => ({ ...l, practice: l.practice.filter((p) => !saved.donePractice.includes(`${l.id}#${p.text}`)) }))
     .filter((l) => l.practice.length > 0)
   // Ältere Einträge ohne Merkmal stammen aus der Testversion, in der jede Aufgabe ein Foto war
-  const photoAttempts = current.filter((a) => a.photo ?? a.lessonId === SAMPLE_LESSON.id)
+  const pageLessons = new Set(Object.values(saved.pages).flatMap((p) => p.tasks.map((t) => t.lessonId)))
+  const photoAttempts = current.filter((a) => (a.photo ?? a.lessonId === SAMPLE_LESSON.id) && !pageLessons.has(a.lessonId))
+  const pages = Object.values(saved.pages).sort((a, b) => b.at.localeCompare(a.at))
+  const page = pageId ? saved.pages[pageId] : undefined
+  // Fertig-Bildschirm: Gehört die Aufgabe zu einer Seite, kommen die übrigen Aufgaben davon als Nächstes
+  const donePage = Object.values(saved.pages).find((p) => p.tasks.some((t) => t.lessonId === lesson.id))
   const overview = lessonOverview(saved)
   const practiced = new Set(current.filter((a) => a.finishedAt).map((a) => a.topic))
 
@@ -243,7 +285,7 @@ export default function App() {
     case 'camera':
       return (
         <Camera
-          onPhoto={(file) => run({ ask: { mode: 'photo-file', file }, how: 'Foto gemacht und bestätigt', waitText: 'Ich lese deine Aufgabe.', back: 'camera', confirm: true })}
+          onPhoto={(file) => run({ ask: { mode: 'page-file', file }, how: 'Seite fotografiert', waitText: 'Ich lese deine Seite.', back: 'camera' })}
           onBack={() => setScreen('home')}
         />
       )
@@ -259,18 +301,35 @@ export default function App() {
           onBack={() => setScreen(job?.back === 'camera' ? 'home' : (job?.back ?? 'home'))}
         />
       )
-    case 'confirm':
-      return <Confirm lesson={lesson} onYes={() => startLesson(lesson, job?.how ?? 'Foto gemacht und bestätigt', true)} onNo={() => setScreen('camera')} />
+    case 'page':
+      return page ? <PageScreen page={page} status={taskStatus(page)} onPick={(i) => startPageTask(page, i)} onBack={() => setScreen('home')} /> : null
     case 'step':
       return <StepScreen lesson={lesson} index={stepIndex} version={version} results={results} onGoTo={onGoTo} onAgain={onAgain} onResult={onResult} onNext={onNext} onStop={onStop} />
     case 'done':
-      return <Done lesson={lesson} farm={saved.farm} egg={gotEgg} rewardMessages={reward} onFarm={() => setScreen('farm')} onHome={() => setScreen('home')} />
+      return (
+        <Done
+          lesson={lesson}
+          farm={saved.farm}
+          egg={gotEgg}
+          rewardMessages={reward}
+          next={
+            donePage && {
+              page: donePage,
+              status: taskStatus(donePage),
+              only: donePage.tasks.flatMap((t, i) => (t.lessonId === lesson.id || taskStatus(donePage)[i] === 'bestanden' ? [] : [i])),
+              onPick: (i) => startPageTask(donePage, i),
+            }
+          }
+          onFarm={() => setScreen('farm')}
+          onHome={() => setScreen('home')}
+        />
+      )
     case 'practice':
       return (
         <PracticeMenu
           selection={saved.selection}
           openCount={finishedLessons.reduce((n, l) => n + l.practice.length, 0)}
-          photoCount={photoAttempts.length}
+          photoCount={pages.length + photoAttempts.length}
           lessonCount={overview.length}
           onSubject={(s) => {
             setSubject(s)
@@ -314,7 +373,6 @@ export default function App() {
               how: 'Offene Übung gestartet',
               waitText: 'Ich bereite deine Übung vor.',
               back: 'open',
-              confirm: false,
               practiceKey: `${l.id}#${text}`,
             })
           }
@@ -324,7 +382,17 @@ export default function App() {
     case 'lessons':
       return <LessonsScreen entries={overview} onStart={(l, passed) => startLesson(l, passed ? 'Aufgabe wiederholt' : 'Aufgabe weitergemacht')} onBack={() => setScreen('practice')} />
     case 'photos':
-      return <PhotosScreen attempts={photoAttempts} onBack={() => setScreen('practice')} />
+      return (
+        <PhotosScreen
+          pages={pages}
+          attempts={photoAttempts}
+          onPage={(p) => {
+            setPageId(p.id)
+            setScreen('page')
+          }}
+          onBack={() => setScreen('practice')}
+        />
+      )
     case 'farm':
       return <FarmScreen farm={saved.farm} onBack={() => setScreen('home')} />
     case 'pin':

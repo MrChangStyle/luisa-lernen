@@ -4,8 +4,9 @@ import { Frac, Inline, Rich } from '../components/Rich'
 import { HenniSays, Ladder, Screen } from '../components/Ui'
 import { GLOSSARY } from '../data/glossary'
 import { checkAnswer, type CheckResult } from '../logic/check'
-import type { Farm, Lesson, Step, VersionKey } from '../types'
+import type { Farm, Lesson, Page, Step, VersionKey } from '../types'
 import { VERSION_LABEL } from '../types'
+import { PageTasks, type TaskStatus } from './Page'
 
 export function Camera({ onPhoto, onBack }: { onPhoto: (file: File) => void; onBack: () => void }) {
   const [file, setFile] = useState<File | null>(null)
@@ -30,8 +31,8 @@ export function Camera({ onPhoto, onBack }: { onPhoto: (file: File) => void; onB
         </>
       }
     >
-      <div className="s-title">Aufgabe fotografieren</div>
-      <p className="mini">Halte das Handy über die Aufgabe. Es soll nur eine Aufgabe im Bild sein.</p>
+      <div className="s-title">Seite fotografieren</div>
+      <p className="mini">Halte das Handy über die Seite. Alle Aufgaben sollen gut zu lesen sein. Danach wählst du, welche du machen willst.</p>
       <input
         id="photo"
         type="file"
@@ -101,39 +102,6 @@ export function Problem({ text, detail, retry, onRetry, onBack }: { text: string
         <div>{text}</div>
       </HenniSays>
       {detail && <p className="mini">Für Eltern: {detail}</p>}
-    </Screen>
-  )
-}
-
-export function Confirm({ lesson, onYes, onNo }: { lesson: Lesson; onYes: () => void; onNo: () => void }) {
-  return (
-    <Screen
-      foot={
-        <>
-          <p className="q">Ist das die richtige Aufgabe?</p>
-          <div className="row2">
-            <button className="btn" onClick={onYes}>
-              Ja, starten
-            </button>
-            <button className="btn sec" onClick={onNo}>
-              Nein, neues Foto
-            </button>
-          </div>
-        </>
-      }
-    >
-      <div className="s-title">Ich habe diese Aufgabe gelesen:</div>
-      <div className="card">
-        <b>{lesson.source}:</b> <Inline text={lesson.task} />
-      </div>
-      <p>
-        <b>Fach:</b> {lesson.subject}
-        <br />
-        <b>Thema:</b> {lesson.topic}
-      </p>
-      <p>
-        Wir gehen die Aufgabe in <b>{lesson.steps.length} Schritten</b> durch. Das Ergebnis rechnest du selbst aus. Ich zeige dir, wie es geht.
-      </p>
     </Screen>
   )
 }
@@ -330,7 +298,18 @@ export function StepScreen({ lesson, index, version, results, onGoTo, onAgain, o
   )
 }
 
-export function Done({ lesson, farm, egg, rewardMessages, onFarm, onHome }: { lesson: Lesson; farm: Farm; egg: boolean; rewardMessages: string[]; onFarm: () => void; onHome: () => void }) {
+interface DoneProps {
+  lesson: Lesson
+  farm: Farm
+  egg: boolean
+  rewardMessages: string[]
+  // Stammt die Aufgabe von einer gescannten Seite, bietet Henni die übrigen Aufgaben davon an
+  next?: { page: Page; status: TaskStatus[]; only: number[]; onPick: (i: number) => void }
+  onFarm: () => void
+  onHome: () => void
+}
+
+export function Done({ lesson, farm, egg, rewardMessages, next, onFarm, onHome }: DoneProps) {
   return (
     <Screen
       foot={
@@ -351,6 +330,14 @@ export function Done({ lesson, farm, egg, rewardMessages, onFarm, onHome }: { le
           Bauernhof ansehen
         </button>
       </section>
+      {next && next.only.length > 0 && (
+        <>
+          <p className="q">Welche Aufgabe von „{next.page.title}“ willst du als Nächstes machen?</p>
+          <PageTasks page={next.page} status={next.status} only={next.only} onPick={next.onPick} />
+          <p className="mini">Du kannst auch eine Pause machen. Die Seite bleibt bei „Aus meinen Fotos“ gespeichert.</p>
+        </>
+      )}
+      {next && next.only.length === 0 && <p className="q">Du hast alle Aufgaben von „{next.page.title}“ geschafft.</p>}
       <p className="q">Zwei neue Übungsaufgaben zum selben Thema:</p>
       {lesson.practice.map((p, i) => (
         <div key={i} className="card">

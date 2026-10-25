@@ -97,6 +97,23 @@ export interface Attempt {
   archivedAt?: string | null
 }
 
+// Eine fotografierte Buch- oder Arbeitsblattseite. Die KI liest sie einmal; danach wählt Luisa daraus Aufgabe für Aufgabe.
+export interface PageTask {
+  label: string
+  topic: string
+  text: string
+  // gesetzt, sobald die KI den Lernpfad zu dieser Aufgabe erstellt hat
+  lessonId?: string
+}
+
+export interface Page {
+  id: string
+  at: string
+  subject: string
+  title: string
+  tasks: PageTask[]
+}
+
 export interface Saved {
   farm: Farm
   // egg: Luisa hat die Stimmung an diesem Tag selbst bestätigt und dafür ein Ei bekommen
@@ -109,4 +126,6 @@ export interface Saved {
   lessons: Record<string, Lesson>
   // Übungen aus „Offene Übungen“, die Luisa schon fertig gemacht hat: "lessonId#nummer"
   donePractice: string[]
+  // Gescannte Seiten, damit eine Aufgabe von dort nicht noch einmal gelesen werden muss
+  pages: Record<string, Page>
 }

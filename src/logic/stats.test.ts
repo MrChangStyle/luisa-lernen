@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { periodLabel, periodOptions, summarize, weekStart } from './stats'
 import type { Saved } from '../types'
 
-const base: Saved = { farm: { egg: 0, chick: 0, hen: 0, rooster: 0, cow: 0 }, mood: {}, selection: [], attempts: [], events: [], parentPin: null, lessons: {}, donePractice: [] }
+const base: Saved = { farm: { egg: 0, chick: 0, hen: 0, rooster: 0, cow: 0 }, mood: {}, selection: [], attempts: [], events: [], parentPin: null, lessons: {}, donePractice: [], pages: {} }
 const done = (id: string, start: string, end: string | null) => ({ id, lessonId: id, subject: 'Mathe', topic: 'T', source: 'Übung', startedAt: start, finishedAt: end, stats: [] })
 
 describe('Übersicht im Familienbereich', () => {

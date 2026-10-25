@@ -10,7 +10,7 @@ export const SUBJECT_NAMES = ['Mathe', 'Deutsch', 'Englisch', 'NT', 'Biologie', 
 export type LessonRequest =
   | { mode: 'photo'; image: string; mediaType: 'image/jpeg' | 'image/png' | 'image/webp' }
   | { mode: 'topic'; subject: string; topic: string }
-  | { mode: 'task'; subject: string; topic: string; text: string }
+  | { mode: 'task'; subject: string; topic: string; text: string; source?: string }
 
 // Antwort der KI, genau nach OUTPUT_SCHEMA
 export interface AiCheck {
@@ -130,7 +130,7 @@ export function userContent(req: LessonRequest): Anthropic.Beta.BetaContentBlock
       return [
         {
           type: 'text',
-          text: `Luisa möchte diese Übungsaufgabe lösen. Fach: ${req.subject}. Thema: ${req.topic}.\n\nAufgabe: ${req.text}\n\nErstelle den Lernpfad dazu. source ist „Übung zu deinem Foto“. topic ist „${req.topic}“.`,
+          text: `Luisa möchte diese Übungsaufgabe lösen. Fach: ${req.subject}. Thema: ${req.topic}.\n\nAufgabe: ${req.text}\n\nErstelle den Lernpfad dazu. source ist „${req.source ?? 'Übung zu deinem Foto'}“. topic ist „${req.topic}“.`,
         },
       ]
   }
@@ -288,7 +288,8 @@ function parseRequest(body: unknown): LessonRequest | null {
   }
   if (!s(b.subject, 40) || !s(b.topic, 80)) return null
   if (b.mode === 'topic') return { mode: 'topic', subject: b.subject as string, topic: b.topic as string }
-  if (b.mode === 'task' && s(b.text, 2000)) return { mode: 'task', subject: b.subject as string, topic: b.topic as string, text: b.text as string }
+  if (b.mode === 'task' && s(b.text, 4000))
+    return { mode: 'task', subject: b.subject as string, topic: b.topic as string, text: b.text as string, ...(s(b.source, 80) ? { source: b.source as string } : {}) }
   return null
 }
 
