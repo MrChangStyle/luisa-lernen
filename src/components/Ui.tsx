@@ -1,13 +1,18 @@
-import type { ReactNode } from 'react'
+import { useEffect, useRef, type ReactNode } from 'react'
 import { Henni } from './Art'
 import { AnimalIcon } from './Art'
 import { FARM_ORDER, animalName } from '../logic/farm'
 import type { Farm } from '../types'
 
-export function Screen({ children, foot }: { children: ReactNode; foot?: ReactNode }) {
+// top: ändert sich der Wert (z. B. neuer Schritt), beginnt die Ansicht wieder ganz oben
+export function Screen({ children, foot, top }: { children: ReactNode; foot?: ReactNode; top?: string }) {
+  const view = useRef<HTMLElement>(null)
+  useEffect(() => view.current?.scrollTo({ top: 0 }), [top])
   return (
     <div className="screen">
-      <main className="view">{children}</main>
+      <main className="view" ref={view}>
+        {children}
+      </main>
       {foot && <footer className="foot">{foot}</footer>}
     </div>
   )
