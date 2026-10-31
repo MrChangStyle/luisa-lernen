@@ -16,5 +16,5 @@
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["api", "middleware.ts", "scripts"]
+  "include": ["api", "server", "middleware.ts", "scripts"]
 }

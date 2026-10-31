@@ -191,7 +191,7 @@ details.fold .card { border: 0; padding: 0; }
 /* Kinder und Hilfen (Familienbereich) */
 .stack { display: grid; gap: 8px; }
 .child-form label { display: grid; gap: 4px; font-size: .93rem; }
-.child-form input:not([type]), .child-form select { font: inherit; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--paper); color: var(--ink); width: 100%; box-sizing: border-box; }
+.child-form input:not([type]), .child-form input[type="password"], .child-form select { font: inherit; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--paper); color: var(--ink); width: 100%; box-sizing: border-box; }
 .child-form label.check { display: flex; gap: 10px; align-items: flex-start; }
 .child-form label.check input { width: 22px; height: 22px; margin-top: 2px; flex: none; accent-color: var(--accent); }
 .read-aloud { justify-self: start; width: fit-content; }
@@ -205,3 +205,4 @@ details.fold .card { border: 0; padding: 0; }
 .placevalue { border-collapse: collapse; font-size: 1.1rem; font-variant-numeric: tabular-nums; }
 .placevalue th, .placevalue td { border: 1px solid var(--line); min-width: 40px; height: 34px; text-align: center; }
 .placevalue th { background: var(--accent-soft); color: var(--accent); }
+.device-code { font: 700 2rem var(--body); letter-spacing: .3em; text-align: center; }

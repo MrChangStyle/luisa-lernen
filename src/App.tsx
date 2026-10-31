@@ -52,12 +52,16 @@ interface AppProps {
   child: Child
   family: FamilyInfo
   setFamily: (fn: (f: FamilyInfo) => FamilyInfo) => void
-  // Familienbereich: dieses Gerät einem anderen Kind zuordnen
-  onAssignDevice: (id: string) => void
+  // kind: eingerichtetes Kindergerät · eltern: Übersicht im Elternbereich · alt: bisheriges Familien-Passwort
+  device: 'kind' | 'eltern' | 'alt'
+  // Nur beim bisherigen Zugang: dieses Gerät einem anderen Kind zuordnen
+  onAssignDevice?: (id: string) => void
+  // Elternbereich: zurück zur Liste der Kinder
+  onExit?: () => void
 }
 
 // Die App eines Kindes. Root baut sie pro Kind neu auf, damit sich die Stände nie vermischen.
-export default function App({ child, family, setFamily, onAssignDevice }: AppProps) {
+export default function App({ child, family, setFamily, device, onAssignDevice, onExit }: AppProps) {
   const [saved, setSaved, cloud] = useSaved(child.id)
   const learner = learnerOf(child)
   // Gemeinsame Eltern-PIN; ältere Stände haben sie noch in Luisas Lernstand
@@ -78,7 +82,8 @@ export default function App({ child, family, setFamily, onAssignDevice }: AppPro
   // Hilfen, die die Anzeige ändern
   const easyFirst = child.helps.includes('leichteSprache')
   const showVisual = child.helps.includes('zahlenBild')
-  const [screen, setScreen] = useState<ScreenName>('home')
+  // Im Elternbereich öffnet sich gleich die Übersicht des Kindes
+  const [screen, setScreen] = useState<ScreenName>(device === 'eltern' ? 'family' : 'home')
   const [mood, setMood] = useState(() => saved.mood[dayKey(new Date())]?.value ?? 50)
   const [moodTouched, setMoodTouched] = useState(false)
   const [subject, setSubject] = useState('Mathe')
@@ -445,6 +450,7 @@ export default function App({ child, family, setFamily, onAssignDevice }: AppPro
         <PinGate
           pin={pin}
           name={child.name}
+          canSetPin={device !== 'kind'}
           onSetPin={(p) => setFamily((f) => ({ ...f, pin: p }))}
           onOk={() => {
             // Luisas bisherige PIN wird beim ersten Öffnen zur gemeinsamen PIN der Familie
@@ -456,6 +462,6 @@ export default function App({ child, family, setFamily, onAssignDevice }: AppPro
       )
     case 'family':
       return <Family packText={packText} child={child} family={family} setFamily={setFamily} onAssignDevice={onAssignDevice} saved={saved} cloud={cloud} lessons={lessons} onArchive={(ids) => setSaved((s) => archiveAttempts(s, ids))}
-          onRestore={(id) => setSaved((s) => restoreAttempt(s, id))} onBack={() => setScreen('home')} />
+          onRestore={(id) => setSaved((s) => restoreAttempt(s, id))} onBack={() => (onExit ? onExit() : setScreen('home'))} backLabel={onExit ? 'Zurück zum Elternbereich' : undefined} />
   }
 }
