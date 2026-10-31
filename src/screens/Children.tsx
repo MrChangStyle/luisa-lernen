@@ -30,11 +30,7 @@ export function ChildrenCard({
   }
   const blank: Child = { id: '', name: '', grade: 3, school: 'Grundschule', helps: [], updatedAt: '' }
   return (
-    <details className="fold" open={open}>
-      <summary>
-        <span>Kinder und Hilfen</span>
-        <span className="pill idle">{family.children.length}</span>
-      </summary>
+    <Box flat={open} title="Kinder und Hilfen" count={family.children.length}>
       {family.children.map((c) =>
         editing === c.id ? (
           <ChildForm key={c.id} start={c} onSave={save} onCancel={() => setEditing(null)} />
@@ -88,6 +84,26 @@ export function ChildrenCard({
         {onAssignDevice ? 'Ein neues Kind bekommt ein Gerät über „Dieses Gerät … geben“.' : 'Ein Gerät richtest du über „Gerät einrichten“ mit einem Code ein.'} Die Eltern-PIN gilt für alle
         Kinder.
       </p>
+    </Box>
+  )
+}
+
+// Im Elternbereich flach (ein Kasten, nichts aufzuklappen), im bisherigen Familienbereich zum Aufklappen
+function Box({ flat, title, count, children }: { flat: boolean; title: string; count: number; children: ReactNode }) {
+  if (flat)
+    return (
+      <section className="stack">
+        <div className="s-title">{title}</div>
+        {children}
+      </section>
+    )
+  return (
+    <details className="fold">
+      <summary>
+        <span>{title}</span>
+        <span className="pill idle">{count}</span>
+      </summary>
+      {children}
     </details>
   )
 }

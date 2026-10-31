@@ -10,6 +10,7 @@ import type { Lesson } from '../types'
 import { VERSION_LABEL } from '../types'
 import { genitive, type Child, type FamilyInfo } from '../logic/learner'
 import { ChildrenCard } from './Children'
+import { hardTopics, preferredVersion } from '../logic/adapt'
 
 // Eine gemeinsame Eltern-PIN für alle Kinder schützt den Bereich vor versehentlichem Öffnen.
 // Echte Eltern-Zugänge per E-Mail kommen in einer späteren Stufe.
@@ -155,6 +156,8 @@ export function Family({ backLabel, packText, child, family, setFamily, onAssign
                   {st.again}× nochmal erklärt
                   {st.helped && ` · geholfen hat: ${VERSION_LABEL[st.helped]}`}
                   {st.wrong.length > 0 && ` · Eingaben, die nicht passten: ${st.wrong.map((w) => `„${w}“`).join(', ')}`}
+                  {(st.stuck ?? 0) > 0 && ` · ${st.stuck}× „Ich verstehe es noch nicht“`}
+                  {st.changed?.length ? ` · Die App hat: ${st.changed.join('; ')}` : ''}
                 </span>
               </span>
             </li>
@@ -197,6 +200,7 @@ export function Family({ backLabel, packText, child, family, setFamily, onAssign
         }
       </p>
       {packText && <p className="mini">{packText}</p>}
+      <Learned name={child.name} saved={saved} />
       <section className="card mood-row">
         {todayMood ? <Face value={todayMood.value} size={56} /> : <span className="mini">–</span>}
         <div>
@@ -302,5 +306,26 @@ export function Family({ backLabel, packText, child, family, setFamily, onAssign
       </details>
       {onAssignDevice && <ChildrenCard family={family} current={child.id} setFamily={setFamily} onAssignDevice={onAssignDevice} />}
     </Screen>
+  )
+}
+
+// Was die App aus dem Lernverhalten gelernt hat und was sie deshalb anders macht
+function Learned({ name, saved }: { name: string; saved: Saved }) {
+  const pref = preferredVersion(saved)
+  const hard = hardTopics(saved)
+  return (
+    <section className="card stack">
+      <b>Was die App über {genitive(name)} Lernen gelernt hat</b>
+      <span className="mini">
+        {pref
+          ? `Am häufigsten hilft die Erklärung „${VERSION_LABEL[pref.key]}“ (${pref.count} von ${pref.total} Schritten). Sie kommt deshalb jetzt zuerst.`
+          : 'Noch nicht genug Aufgaben, um zu sehen, welche Erklärung am besten hilft. Ab 3 gelösten Schritten mit klarer Tendenz kommt die beste Erklärung zuerst.'}
+      </span>
+      <span className="mini">
+        {hard.length
+          ? `Schwer war zuletzt: ${hard.join(', ')}. Neue Aufgaben zu diesen Themen erstellt die App leichter (kleinere Schritte, Bild, Leichte Sprache).`
+          : `${name} hat bisher bei keinem Thema „Ich verstehe es noch nicht“ gedrückt.`}
+      </span>
+    </section>
   )
 }
