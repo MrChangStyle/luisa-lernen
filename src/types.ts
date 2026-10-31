@@ -90,6 +90,10 @@ export interface StepStat {
   again: number
   wrong: string[]
   helped: VersionKey | null
+  // wie oft das Kind „Ich verstehe es noch nicht“ gedrückt hat
+  stuck?: number
+  // was die App daraufhin geändert hat (für die Eltern sichtbar)
+  changed?: string[]
 }
 
 // Alles, was gespeichert bleibt (Cloud und Kopie auf dem Gerät). Logik dazu in state.ts und logic/merge.ts.

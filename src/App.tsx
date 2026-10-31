@@ -7,15 +7,16 @@ import { dayKey, moodText } from './logic/mood'
 import { Family, PinGate } from './screens/Family'
 import { FarmScreen } from './screens/Farm'
 import { Home } from './screens/Home'
-import { Camera, Done, Problem, StepScreen, Waiting } from './screens/Learn'
+import { Camera, Done, Problem, StepScreen, Stuck, Waiting } from './screens/Learn'
 import { PageScreen, type TaskStatus } from './screens/Page'
 import { SUBJECTS } from './data/subjects'
 import { LessonsScreen, OpenScreen, PhotosScreen, PracticeMenu, SelectionScreen, SubjectScreen } from './screens/Practice'
 import { packageIdFor } from './data/packages'
 import { nextLesson, usePackage, withEasyFirst } from './logic/content'
 import { learnerOf, type Child, type FamilyInfo } from './logic/learner'
+import { easierLearner, easierLesson, hardTopics, preferredVersion, withFirst } from './logic/adapt'
 import { archiveAttempts, clock, lessonOverview, passedBefore, restoreAttempt, useSaved, withEvent, withLesson, type Attempt } from './state'
-import { VERSION_LABEL, type Lesson, type Page, type Topic } from './types'
+import { VERSION_LABEL, type Lesson, type Page, type Topic, type VersionKey } from './types'
 
 
 // Ein Auftrag an die KI: was sie erstellen soll und wohin es danach geht
@@ -28,6 +29,8 @@ interface Job {
   practiceKey?: string
   // Aufgabe von einer gescannten Seite: der Lernpfad wird dort vermerkt
   pageTask?: { pageId: string; index: number }
+  // Das Kind hat etwas nicht verstanden: die KI erstellt die Aufgabe leichter (kleinere Schritte, Bild, Leichte Sprache)
+  easier?: boolean
 }
 
 type ScreenName =
@@ -38,6 +41,7 @@ type ScreenName =
   | 'done'
   | 'waiting'
   | 'problem'
+  | 'stuck'
   | 'practice'
   | 'subject'
   | 'selection'
@@ -103,7 +107,12 @@ export default function App({ child, family, setFamily, device, onAssignDevice, 
 
   const lessons: Record<string, Lesson> = { [SAMPLE_LESSON.id]: SAMPLE_LESSON, ...saved.lessons }
   const rawLesson = lessons[lessonId] ?? SAMPLE_LESSON
-  const lesson = easyFirst ? withEasyFirst(rawLesson) : rawLesson
+  // Erklärung, die bei diesem Kind meistens hilft, kommt zuerst (beim Start der Aufgabe festgelegt)
+  const [firstKey, setFirstKey] = useState<VersionKey | null>(null)
+  // Schritte, bei denen das Kind „Ich verstehe es noch nicht“ gedrückt hat: Leichte Sprache, Bild und Tipp
+  const [helpOn, setHelpOn] = useState<boolean[]>([])
+  const shown = withFirst(rawLesson, firstKey)
+  const lesson = easyFirst ? withEasyFirst(shown) : shown
   const version = versions[stepIndex] ?? 0
   const result = results[stepIndex] ?? null
   const setVersion = (v: number) => setVersions((old) => Object.assign([...old], { [stepIndex]: v }))
@@ -145,7 +154,8 @@ export default function App({ child, family, setFamily, device, onAssignDevice, 
     setJob(j)
     setScreen('waiting')
     try {
-      const answer = j.ask.mode === 'page-file' ? await requestPage(await shrinkPhoto(j.ask.file), learner, ctrl.signal) : await requestLesson(j.ask, learner, ctrl.signal)
+      const forAi = j.easier ? easierLearner(learner) : learner
+      const answer = j.ask.mode === 'page-file' ? await requestPage(await shrinkPhoto(j.ask.file), forAi, ctrl.signal) : await requestLesson(j.ask, forAi, ctrl.signal)
       if (ctrl.signal.aborted) return
       if ('page' in answer) {
         const page: Page = { id: crypto.randomUUID(), at: new Date().toISOString(), ...answer.page }
@@ -218,7 +228,9 @@ export default function App({ child, family, setFamily, device, onAssignDevice, 
       startLesson(ready, `${how}, aus dem Paket ${pkg!.title}`)
       return
     }
-    return run({ ask: { mode: 'topic', subject: subj, topic }, how, waitText: `Ich denke mir eine Aufgabe zu „${topic}“ aus.`, back })
+    // Bei Themen, die zuletzt schwerfielen, erstellt die KI die Aufgabe gleich leichter
+    const easier = hardTopics(saved).includes(topic)
+    return run({ ask: { mode: 'topic', subject: subj, topic }, how: easier ? `${how}, leichter (Thema fiel zuletzt schwer)` : how, waitText: `Ich denke mir eine Aufgabe zu „${topic}“ aus.`, back, easier })
   }
 
   const startLesson = (l: Lesson, how: string, photo = false) => {
@@ -239,6 +251,8 @@ export default function App({ child, family, setFamily, device, onAssignDevice, 
     setStepIndex(0)
     setVersions([])
     setResults([])
+    setHelpOn([])
+    setFirstKey(preferredVersion(saved)?.key ?? null)
     setScreen('step')
   }
 
@@ -260,6 +274,48 @@ export default function App({ child, family, setFamily, device, onAssignDevice, 
     if (result?.status !== 'ok') setResult(null)
     updateStat((st) => ({ ...st, again: st.again + 1 }))
     setSaved((s) => withEvent(s, `Schritt ${stepIndex + 1}: „Erklär es mir nochmal“ → ${VERSION_LABEL[lesson.steps[stepIndex].versions[next].key]}`))
+  }
+
+  const stat = saved.attempts.find((a) => a.id === attemptId)?.stats[stepIndex]
+  const note = (what: string) => updateStat((st) => ({ ...st, changed: [...(st.changed ?? []), what] }))
+
+  // „Ich verstehe es noch nicht“: beim ersten Mal sofort leichter erklären, beim zweiten Mal Henni fragt, wie es weitergeht
+  const onStuck = () => {
+    const n = (stat?.stuck ?? 0) + 1
+    const step = lesson.steps[stepIndex]
+    updateStat((st) => ({ ...st, stuck: n }))
+    if (n === 1) {
+      setHelpOn((old) => Object.assign([...old], { [stepIndex]: true }))
+      const easy = step.versions.findIndex((v) => v.key === 'leicht')
+      if (easy >= 0) setVersion(easy)
+      const what = `Erklärung leichter gemacht${step.visual ? ', Bild und' : ' und'} Tipp gezeigt`
+      note(what)
+      setSaved((s) => withEvent(s, `Schritt ${stepIndex + 1}: „Ich verstehe es noch nicht“ → ${what}`))
+      return
+    }
+    setSaved((s) => withEvent(s, `Schritt ${stepIndex + 1}: „Ich verstehe es noch nicht“ (${n}. Mal) → Henni bietet eine leichtere Aufgabe an`))
+    setScreen('stuck')
+  }
+
+  const startEasier = () => {
+    const topic = pkg?.subject === lesson.subject ? pkg.topics.find((t) => t.name === lesson.topic) : undefined
+    const easier = topic && easierLesson(topic, saved, rawLesson)
+    if (easier) {
+      note('Leichtere Aufgabe aus dem Paket gewählt')
+      setSaved((s) => withLesson(s, easier))
+      setLessonId(easier.id)
+      setPracticeKey(null)
+      startLesson(easier, 'Leichtere Aufgabe nach „Ich verstehe es noch nicht“')
+      return
+    }
+    note('Aufgabe leichter neu erstellt (kleinere Schritte, Bild, Leichte Sprache)')
+    run({
+      ask: { mode: 'task', subject: lesson.subject, topic: lesson.topic, text: lesson.task, source: 'leichter gemacht' },
+      how: 'Leichtere Fassung nach „Ich verstehe es noch nicht“',
+      waitText: 'Ich mache die Aufgabe leichter.',
+      back: 'step',
+      easier: true,
+    })
   }
 
   const onStop = () => {
@@ -352,7 +408,19 @@ export default function App({ child, family, setFamily, device, onAssignDevice, 
     case 'page':
       return page ? <PageScreen page={page} status={taskStatus(page)} onPick={(i) => startPageTask(page, i)} onBack={() => setScreen('home')} /> : null
     case 'step':
-      return <StepScreen showVisual={showVisual} readAloud={child.helps.includes('vorlesen')} lesson={lesson} index={stepIndex} version={version} results={results} onGoTo={onGoTo} onAgain={onAgain} onResult={onResult} onNext={onNext} onStop={onStop} />
+      return <StepScreen onStuck={onStuck} helpOn={!!helpOn[stepIndex]} showVisual={showVisual} readAloud={child.helps.includes('vorlesen')} lesson={lesson} index={stepIndex} version={version} results={results} onGoTo={onGoTo} onAgain={onAgain} onResult={onResult} onNext={onNext} onStop={onStop} />
+    case 'stuck':
+      return (
+        <Stuck
+          onEasier={startEasier}
+          onLookAgain={() => setScreen('step')}
+          onPause={() => {
+            note('Pause gemacht, ein Erwachsener soll helfen')
+            setSaved((s) => withEvent(s, `Pause bei „${lesson.topic}“, Schritt ${stepIndex + 1}: ein Erwachsener soll helfen`))
+            setScreen('home')
+          }}
+        />
+      )
     case 'done':
       return (
         <Done
