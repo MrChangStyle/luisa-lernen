@@ -11,6 +11,7 @@ import { Camera, Done, Problem, StepScreen, Waiting } from './screens/Learn'
 import { PageScreen, type TaskStatus } from './screens/Page'
 import { SUBJECTS } from './data/subjects'
 import { LessonsScreen, OpenScreen, PhotosScreen, PracticeMenu, SelectionScreen, SubjectScreen } from './screens/Practice'
+import { learnerOf, type Child, type FamilyInfo } from './logic/learner'
 import { archiveAttempts, clock, lessonOverview, passedBefore, restoreAttempt, useSaved, withEvent, withLesson, type Attempt } from './state'
 import { VERSION_LABEL, type Lesson, type Page } from './types'
 
@@ -46,15 +47,27 @@ type ScreenName =
   | 'pin'
   | 'family'
 
-export default function App() {
-  const [saved, setSaved, cloud] = useSaved()
+interface AppProps {
+  child: Child
+  family: FamilyInfo
+  setFamily: (fn: (f: FamilyInfo) => FamilyInfo) => void
+  // nur gesetzt, wenn es mehr als ein Kind gibt
+  onSwitch?: () => void
+}
+
+// Die App eines Kindes. Root baut sie pro Kind neu auf, damit sich die Stände nie vermischen.
+export default function App({ child, family, setFamily, onSwitch }: AppProps) {
+  const [saved, setSaved, cloud] = useSaved(child.id)
+  const learner = learnerOf(child)
+  // Gemeinsame Eltern-PIN; ältere Stände haben sie noch in Luisas Lernstand
+  const pin = family.pin ?? saved.parentPin
   const [screen, setScreen] = useState<ScreenName>('home')
   const [mood, setMood] = useState(() => saved.mood[dayKey(new Date())]?.value ?? 50)
   const [moodTouched, setMoodTouched] = useState(false)
   const [subject, setSubject] = useState('Mathe')
   const [attemptId, setAttemptId] = useState<string | null>(null)
   const [stepIndex, setStepIndex] = useState(0)
-  // Pro Schritt gemerkt, damit Luisa zurückgehen kann und ihre Antworten sichtbar bleiben
+  // Pro Schritt gemerkt, damit das Kind zurückgehen kann und ihre Antworten sichtbar bleiben
   const [versions, setVersions] = useState<number[]>([])
   const [results, setResults] = useState<(CheckResult | null)[]>([])
   const [reward, setReward] = useState<string[]>([])
@@ -75,7 +88,7 @@ export default function App() {
   const today = dayKey(new Date())
   const todayMood = saved.mood[today]
 
-  // Stimmung wird einmal pro Tag gespeichert, sobald Luisa nach dem Einstellen mit dem Lernen anfängt
+  // Stimmung wird einmal pro Tag gespeichert, sobald das Kind nach dem Einstellen mit dem Lernen anfängt
   const saveMoodIfNeeded = () => {
     if (!moodTouched || todayMood) return
     const at = new Date().toISOString()
@@ -109,7 +122,7 @@ export default function App() {
     setJob(j)
     setScreen('waiting')
     try {
-      const answer = j.ask.mode === 'page-file' ? await requestPage(await shrinkPhoto(j.ask.file), ctrl.signal) : await requestLesson(j.ask, ctrl.signal)
+      const answer = j.ask.mode === 'page-file' ? await requestPage(await shrinkPhoto(j.ask.file), learner, ctrl.signal) : await requestLesson(j.ask, learner, ctrl.signal)
       if (ctrl.signal.aborted) return
       if ('page' in answer) {
         const page: Page = { id: crypto.randomUUID(), at: new Date().toISOString(), ...answer.page }
@@ -247,7 +260,7 @@ export default function App() {
     setScreen('done')
   }
 
-  // Offene Übungen: die zwei neuen Aufgaben jedes fertigen Lernpfads, die Luisa noch nicht gemacht hat
+  // Offene Übungen: die zwei neuen Aufgaben jedes fertigen Lernpfads, die das Kind noch nicht gemacht hat
   const current = saved.attempts.filter((a) => !a.archivedAt)
   const finishedLessons = [...new Set(current.filter((a) => a.finishedAt).map((a) => a.lessonId))]
     .map((id) => lessons[id])
@@ -268,6 +281,8 @@ export default function App() {
     case 'home':
       return (
         <Home
+          name={child.name}
+          onSwitch={onSwitch}
           mood={mood}
           moodSavedAt={todayMood ? clock(todayMood.at) : null}
           moodEgg={!!todayMood?.egg}
@@ -304,7 +319,7 @@ export default function App() {
     case 'page':
       return page ? <PageScreen page={page} status={taskStatus(page)} onPick={(i) => startPageTask(page, i)} onBack={() => setScreen('home')} /> : null
     case 'step':
-      return <StepScreen lesson={lesson} index={stepIndex} version={version} results={results} onGoTo={onGoTo} onAgain={onAgain} onResult={onResult} onNext={onNext} onStop={onStop} />
+      return <StepScreen readAloud={child.helps.includes('vorlesen')} lesson={lesson} index={stepIndex} version={version} results={results} onGoTo={onGoTo} onAgain={onAgain} onResult={onResult} onNext={onNext} onStop={onStop} />
     case 'done':
       return (
         <Done
@@ -396,9 +411,21 @@ export default function App() {
     case 'farm':
       return <FarmScreen farm={saved.farm} onBack={() => setScreen('home')} />
     case 'pin':
-      return <PinGate pin={saved.parentPin} onSetPin={(p) => setSaved((s) => ({ ...s, parentPin: p }))} onOk={() => setScreen('family')} onBack={() => setScreen('home')} />
+      return (
+        <PinGate
+          pin={pin}
+          name={child.name}
+          onSetPin={(p) => setFamily((f) => ({ ...f, pin: p }))}
+          onOk={() => {
+            // Luisas bisherige PIN wird beim ersten Öffnen zur gemeinsamen PIN der Familie
+            if (!family.pin && pin) setFamily((f) => ({ ...f, pin }))
+            setScreen('family')
+          }}
+          onBack={() => setScreen('home')}
+        />
+      )
     case 'family':
-      return <Family saved={saved} cloud={cloud} lessons={lessons} onArchive={(ids) => setSaved((s) => archiveAttempts(s, ids))}
+      return <Family child={child} family={family} setFamily={setFamily} saved={saved} cloud={cloud} lessons={lessons} onArchive={(ids) => setSaved((s) => archiveAttempts(s, ids))}
           onRestore={(id) => setSaved((s) => restoreAttempt(s, id))} onBack={() => setScreen('home')} />
   }
 }

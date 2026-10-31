@@ -1,4 +1,5 @@
 import type { Lesson, PageTask } from '../types'
+import type { Learner } from './learner'
 
 // Anfrage an den Server (api/lesson.ts), der mit der KI den Lernpfad erstellt
 export type LessonAsk =
@@ -10,10 +11,11 @@ export type LessonAnswer = { lesson: Lesson } | { problem: string } | { error: s
 
 export type PageAnswer = { page: { subject: string; title: string; tasks: PageTask[] } } | { problem: string } | { error: string; detail?: string }
 
-export const requestLesson = (ask: LessonAsk, signal: AbortSignal) => post<LessonAnswer>('/api/lesson', ask, 'lesson', signal)
+// learner: wer lernt und welche Hilfen gelten (Spitzname, Klasse, Schulart, Hilfen; keine Diagnose)
+export const requestLesson = (ask: LessonAsk, learner: Learner, signal: AbortSignal) => post<LessonAnswer>('/api/lesson', { ...ask, learner }, 'lesson', signal)
 
 // Liest eine fotografierte Seite (api/page.ts) und liefert nur die Liste der Aufgaben darauf
-export const requestPage = (image: string, signal: AbortSignal) => post<PageAnswer>('/api/page', { image, mediaType: 'image/jpeg' }, 'page', signal)
+export const requestPage = (image: string, learner: Learner, signal: AbortSignal) => post<PageAnswer>('/api/page', { image, mediaType: 'image/jpeg', learner }, 'page', signal)
 
 async function post<T>(url: string, body: unknown, key: string, signal: AbortSignal): Promise<T> {
   try {

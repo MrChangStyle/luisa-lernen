@@ -1,4 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk'
+import { LUISA, parseLearner, type Learner } from '../src/logic/learner.js'
 
 // Liest eine fotografierte Schulbuch- oder Arbeitsblattseite und listet die Aufgaben darauf.
 // Kein Lernpfad, keine Lösungen: nur Abschreiben. Deshalb mit wenig Aufwand und kleinem Token-Rahmen.
@@ -25,7 +26,7 @@ export const PAGE_SCHEMA = obj({
   tasks: { type: 'array', items: obj({ label: str, topic: str, text: str }) },
 })
 
-export const PAGE_PROMPT = `Du liest für eine Lern-App eine fotografierte Seite aus einem Schulbuch oder Arbeitsblatt (6. Klasse Mittelschule, Bayern). Die Schülerin heißt Luisa.
+export const pagePrompt = (l: Learner = LUISA) => `Du liest für eine Lern-App eine fotografierte Seite aus einem Schulbuch oder Arbeitsblatt (${l.grade}. Klasse ${l.school}, Bayern). Das Kind heißt ${l.name}.
 
 Deine Aufgabe ist nur das genaue Abschreiben, nie das Lösen:
 - tasks: jede Aufgabe auf der Seite, in der Reihenfolge der Seite. Teilaufgaben (a, b, c …) gehören zu ihrer Aufgabe, außer sie sind lang und eigenständig.
@@ -36,23 +37,23 @@ Deine Aufgabe ist nur das genaue Abschreiben, nie das Lösen:
 - Bereits gelöste Beispielaufgaben, Merkkästen und reine Erklärtexte sind keine Aufgaben.
 - readable ist true, problem ist leer.
 
-Wenn das Foto nicht lesbar ist oder keine Aufgabe zeigt: readable false, problem ein ruhiger Satz an Luisa, was sie tun kann (z. B. „Das Foto ist zu dunkel. Mache bitte ein neues Foto mit mehr Licht.“), title leer, tasks leer.`
+Wenn das Foto nicht lesbar ist oder keine Aufgabe zeigt: readable false, problem ein ruhiger Satz an ${l.name} in der Du-Form, was zu tun ist (z. B. „Das Foto ist zu dunkel. Mache bitte ein neues Foto mit mehr Licht.“), title leer, tasks leer.`
 
 const MODEL = 'claude-opus-5-5'
 
-export async function readPage(client: Anthropic, image: string, mediaType: 'image/jpeg' | 'image/png' | 'image/webp'): Promise<{ page: Omit<AiPage, 'readable' | 'problem'> } | { problem: string }> {
+export async function readPage(client: Anthropic, image: string, mediaType: 'image/jpeg' | 'image/png' | 'image/webp', l: Learner = LUISA): Promise<{ page: Omit<AiPage, 'readable' | 'problem'> } | { problem: string }> {
   const message = await client.beta.messages
     .stream({
       model: MODEL,
       max_tokens: 12000,
       output_config: { effort: 'low', format: { type: 'json_schema', schema: PAGE_SCHEMA } },
-      system: PAGE_PROMPT,
+      system: pagePrompt(l),
       messages: [
         {
           role: 'user',
           content: [
             { type: 'image', source: { type: 'base64', media_type: mediaType, data: image } },
-            { type: 'text', text: 'Luisa hat diese Seite fotografiert. Liste die Aufgaben darauf.' },
+            { type: 'text', text: `${l.name} hat diese Seite fotografiert. Liste die Aufgaben darauf.` },
           ],
         },
       ],
@@ -80,11 +81,11 @@ export async function POST(request: Request): Promise<Response> {
   if (!process.env.ANTHROPIC_API_KEY) {
     return json({ error: 'Die KI ist noch nicht eingerichtet. Ein Elternteil muss den Schlüssel bei Vercel eintragen.' }, 503)
   }
-  const b = (await request.json().catch(() => null)) as { image?: unknown; mediaType?: unknown } | null
+  const b = (await request.json().catch(() => null)) as { image?: unknown; mediaType?: unknown; learner?: unknown } | null
   const ok = typeof b?.image === 'string' && b.image.length > 0 && b.image.length <= 7_000_000 && ['image/jpeg', 'image/png', 'image/webp'].includes(b.mediaType as string)
   if (!ok) return json({ error: 'Die Anfrage war unvollständig.' }, 400)
   try {
-    return json(await readPage(new Anthropic(), b!.image as string, b!.mediaType as 'image/jpeg'))
+    return json(await readPage(new Anthropic(), b!.image as string, b!.mediaType as 'image/jpeg', parseLearner(b!.learner) ?? LUISA))
   } catch (e) {
     console.error(e)
     const text = e instanceof Anthropic.APIError ? 'Die KI ist gerade nicht erreichbar.' : e instanceof Error ? e.message : 'Unbekannter Fehler.'

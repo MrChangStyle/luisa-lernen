@@ -3,6 +3,8 @@ import { HenniSays, Screen } from '../components/Ui'
 import { moodText } from '../logic/mood'
 
 interface Props {
+  name: string
+  onSwitch?: () => void
   mood: number
   moodSavedAt: string | null
   moodEgg: boolean
@@ -11,7 +13,7 @@ interface Props {
   go: (s: 'camera' | 'practice' | 'farm' | 'family') => void
 }
 
-export function Home({ mood, moodSavedAt, moodEgg, onMood, onConfirmMood, go }: Props) {
+export function Home({ name, onSwitch, mood, moodSavedAt, moodEgg, onMood, onConfirmMood, go }: Props) {
   return (
     <Screen
       foot={
@@ -27,6 +29,11 @@ export function Home({ mood, moodSavedAt, moodEgg, onMood, onConfirmMood, go }: 
               Mein Bauernhof
             </button>
           </div>
+          {onSwitch && (
+            <button className="link" onClick={onSwitch}>
+              Anderes Kind wählen
+            </button>
+          )}
           <button className="link" onClick={() => go('family')}>
             Familienbereich (für Eltern)
           </button>
@@ -34,7 +41,7 @@ export function Home({ mood, moodSavedAt, moodEgg, onMood, onConfirmMood, go }: 
       }
     >
       <HenniSays big>
-        <div className="s-title small">Hallo Luisa.</div>
+        <div className="s-title small">Hallo {name}.</div>
         <div>Ich bin Henni, dein Lehrerhuhn. Ich erkläre dir heute deine Aufgaben, Schritt für Schritt.</div>
       </HenniSays>
       <section className="card mood">

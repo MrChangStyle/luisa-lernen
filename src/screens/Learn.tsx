@@ -4,6 +4,7 @@ import { Frac, Inline, Rich } from '../components/Rich'
 import { HenniSays, Ladder, Screen } from '../components/Ui'
 import { GLOSSARY } from '../data/glossary'
 import { checkAnswer, type CheckResult } from '../logic/check'
+import { spoken } from '../logic/speech'
 import type { Farm, Lesson, Page, Step, VersionKey } from '../types'
 import { VERSION_LABEL } from '../types'
 import { PageTasks, type TaskStatus } from './Page'
@@ -196,9 +197,33 @@ interface StepProps {
   onResult: (r: CheckResult) => void
   onNext: () => void
   onStop: () => void
+  // Hilfe „Vorlesen“: Henni liest die Erklärung vor
+  readAloud?: boolean
 }
 
-// Was Luisa in den Schritten davor herausgefunden hat. Ein Tipp führt zurück zu diesem Schritt.
+function ReadAloud({ text }: { text: string }) {
+  const [on, setOn] = useState(false)
+  useEffect(() => () => window.speechSynthesis?.cancel(), [text])
+  if (typeof window === 'undefined' || !('speechSynthesis' in window)) return null
+  const toggle = () => {
+    window.speechSynthesis.cancel()
+    if (on) return setOn(false)
+    const u = new SpeechSynthesisUtterance(spoken(text))
+    u.lang = 'de-DE'
+    u.rate = 0.9
+    u.onend = () => setOn(false)
+    u.onerror = () => setOn(false)
+    setOn(true)
+    window.speechSynthesis.speak(u)
+  }
+  return (
+    <button type="button" className="btn sec slim read-aloud" onClick={toggle} aria-pressed={on}>
+      {on ? 'Vorlesen anhalten' : 'Vorlesen'}
+    </button>
+  )
+}
+
+// Was das Kind in den Schritten davor herausgefunden hat. Ein Tipp führt zurück zu diesem Schritt.
 function Earlier({ lesson, index, results, onGoTo }: { lesson: Lesson; index: number; results: (CheckResult | null)[]; onGoTo: (i: number) => void }) {
   if (index === 0) return null
   return (
@@ -223,7 +248,7 @@ function Earlier({ lesson, index, results, onGoTo }: { lesson: Lesson; index: nu
   )
 }
 
-export function StepScreen({ lesson, index, version, results, onGoTo, onAgain, onResult, onNext, onStop }: StepProps) {
+export function StepScreen({ lesson, index, version, results, onGoTo, onAgain, onResult, onNext, onStop, readAloud }: StepProps) {
   const result = results[index] ?? null
   const step = lesson.steps[index]
   const v = step.versions[version]
@@ -284,6 +309,7 @@ export function StepScreen({ lesson, index, version, results, onGoTo, onAgain, o
         <div className="explain">
           <Rich text={v.text} onTerm={(t) => setTerm(term === t ? null : t)} />
         </div>
+        {readAloud && <ReadAloud key={`${index}-${version}`} text={`${step.title}. ${v.text}`} />}
       </HenniSays>
       {term && glossary[term] && (
         <div className="gloss">
