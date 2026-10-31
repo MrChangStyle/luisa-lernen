@@ -112,28 +112,33 @@ export function useSaved(child: string) {
 // Kinderliste und gemeinsame Eltern-PIN: auf dem Gerät und in der Cloud (Zeile „kinder“)
 const FAMILY_KEY = 'luisa-lernen:kinder'
 
-function loadFamily(): FamilyInfo {
+function loadFamily(key: string, start: FamilyInfo): FamilyInfo {
   try {
-    const raw = localStorage.getItem(FAMILY_KEY)
-    return raw ? mergeFamily(EMPTY_FAMILY, JSON.parse(raw)) : EMPTY_FAMILY
+    const raw = localStorage.getItem(key)
+    return raw ? mergeFamily(start, JSON.parse(raw)) : start
   } catch {
-    return EMPTY_FAMILY
+    return start
   }
 }
 
-export function useFamily() {
-  const [family, setFamily] = useState<FamilyInfo>(loadFamily)
+// Eltern-Konten: eigene Liste pro Familie, ohne Luisa als Startwert
+export const parentFamily = (familyId: string) => ({ key: `${FAMILY_KEY}:${familyId}`, start: { children: [], pin: null } as FamilyInfo })
+
+// readOnly: nur lesen (Kindergerät). Ändern darf die Liste nur ein Eltern-Konto.
+export function useFamily({ key = FAMILY_KEY, start = EMPTY_FAMILY, readOnly = false }: { key?: string; start?: FamilyInfo; readOnly?: boolean } = {}) {
+  const [family, setFamily] = useState<FamilyInfo>(() => loadFamily(key, start))
+  const startText = JSON.stringify(start)
   const [ready, setReady] = useState(false)
   const [retry, setRetry] = useState(0)
   const synced = useRef<string | null>(null)
 
   useEffect(() => {
     try {
-      localStorage.setItem(FAMILY_KEY, JSON.stringify(family))
+      localStorage.setItem(key, JSON.stringify(family))
     } catch {
       // egal, die Cloud hat die Liste auch
     }
-  }, [family])
+  }, [family, key])
 
   useEffect(() => {
     const pull = async () => {
@@ -156,9 +161,9 @@ export function useFamily() {
 
   // Nur hochladen, wenn es etwas Eigenes gibt: Solange nur Luisa ohne PIN da ist, bleibt die Cloud unberührt
   useEffect(() => {
-    if (!ready) return
+    if (!ready || readOnly) return
     const sent = JSON.stringify(family)
-    if (sent === synced.current || sent === JSON.stringify(EMPTY_FAMILY)) return
+    if (sent === synced.current || sent === startText) return
     const t = setTimeout(async () => {
       const r = await cloudCall<{ family: FamilyInfo | null }>('/api/data?familie', 'PUT', { family })
       if (r === 'aus') return
@@ -171,7 +176,7 @@ export function useFamily() {
       })
     }, 800)
     return () => clearTimeout(t)
-  }, [family, ready, retry])
+  }, [family, ready, retry, startText, readOnly])
 
   return [family, setFamily] as const
 }

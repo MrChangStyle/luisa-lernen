@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { HELP_KEYS, HELPS, PROFILES, SCHOOLS, genitive, type Child, type FamilyInfo, type HelpKey } from '../logic/learner'
 
 // Familienbereich: Kinder anlegen und ihre Hilfen einstellen. Gespeichert werden nur die Hilfen, keine Diagnose.
@@ -7,11 +7,17 @@ export function ChildrenCard({
   current,
   setFamily,
   onAssignDevice,
+  extra,
+  open = false,
 }: {
   family: FamilyInfo
-  current: string
+  current?: string
   setFamily: (fn: (f: FamilyInfo) => FamilyInfo) => void
-  onAssignDevice: (id: string) => void
+  // bisheriger Zugang: dieses Gerät einem Kind zuordnen
+  onAssignDevice?: (id: string) => void
+  // Elternbereich: weitere Knöpfe pro Kind (Übersicht, Gerät einrichten)
+  extra?: (c: Child) => ReactNode
+  open?: boolean
 }) {
   const [assigning, setAssigning] = useState<string | null>(null)
   const [editing, setEditing] = useState<string | null>(null)
@@ -22,9 +28,9 @@ export function ChildrenCard({
     }))
     setEditing(null)
   }
-  const blank: Child = { id: '', name: '', grade: 5, school: 'Mittelschule', helps: [], updatedAt: '' }
+  const blank: Child = { id: '', name: '', grade: 3, school: 'Grundschule', helps: [], updatedAt: '' }
   return (
-    <details className="fold">
+    <details className="fold" open={open}>
       <summary>
         <span>Kinder und Hilfen</span>
         <span className="pill idle">{family.children.length}</span>
@@ -47,7 +53,9 @@ export function ChildrenCard({
             <button className="btn sec slim" onClick={() => setEditing(c.id)}>
               Ändern
             </button>
-            {c.id !== current &&
+            {extra?.(c)}
+            {onAssignDevice &&
+              c.id !== current &&
               (assigning === c.id ? (
                 <div className="fb no stack" role="alertdialog">
                   <span>Dieses Gerät gehört danach {c.name}. Hier sind dann nur noch {genitive(c.name)} Aufgaben und Bauernhof zu sehen. Die Daten der anderen Kinder bleiben erhalten.</span>
@@ -75,7 +83,11 @@ export function ChildrenCard({
           Kind hinzufügen
         </button>
       )}
-      <p className="mini">Jedes Kind lernt auf seinem eigenen Gerät und sieht nur seine eigenen Aufgaben, seinen Bauernhof und seinen Verlauf. Ein neues Kind bekommt ein Gerät über „Dieses Gerät … geben“. Die Eltern-PIN gilt für alle Kinder.</p>
+      <p className="mini">
+        Jedes Kind lernt auf seinem eigenen Gerät und sieht nur seine eigenen Aufgaben, seinen Bauernhof und seinen Verlauf.{' '}
+        {onAssignDevice ? 'Ein neues Kind bekommt ein Gerät über „Dieses Gerät … geben“.' : 'Ein Gerät richtest du über „Gerät einrichten“ mit einem Code ein.'} Die Eltern-PIN gilt für alle
+        Kinder.
+      </p>
     </details>
   )
 }

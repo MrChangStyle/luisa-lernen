@@ -22,7 +22,7 @@ describe('Passwortschutz', () => {
   it('sperrt auch die KI-Schnittstelle', async () => {
     const res = await middleware(new Request(`${BASE}/api/lesson`, { method: 'POST' }))
     expect(res.status).toBe(401)
-    expect((await res.json()).error).toContain('Familien-Passwort')
+    expect((await res.json()).error).toContain('melde dich')
   })
 
   it('lehnt ein falsches Passwort ab', async () => {
@@ -48,8 +48,10 @@ describe('Passwortschutz', () => {
     expect((await middleware(new Request(`${BASE}/`, { headers: { cookie } }))).status).toBe(401)
   })
 
-  it('bleibt gesperrt, solange kein Passwort eingerichtet ist', async () => {
+  it('bleibt gesperrt, solange kein Zugang eingerichtet ist', async () => {
     vi.stubEnv('APP_PASSWORD', '')
+    vi.stubEnv('SUPABASE_SECRET_KEY', '')
+    vi.stubEnv('SESSION_SECRET', '')
     const res = await middleware(new Request(`${BASE}/`))
     expect(res.status).toBe(503)
   })

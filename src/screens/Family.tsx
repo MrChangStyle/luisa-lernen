@@ -13,7 +13,22 @@ import { ChildrenCard } from './Children'
 
 // Eine gemeinsame Eltern-PIN für alle Kinder schützt den Bereich vor versehentlichem Öffnen.
 // Echte Eltern-Zugänge per E-Mail kommen in einer späteren Stufe.
-export function PinGate({ pin, name, onSetPin, onOk, onBack }: { pin: string | null; name: string; onSetPin: (p: string) => void; onOk: () => void; onBack: () => void }) {
+export function PinGate({
+  pin,
+  name,
+  canSetPin = true,
+  onSetPin,
+  onOk,
+  onBack,
+}: {
+  pin: string | null
+  name: string
+  // Kindergerät: Die PIN legt ein Elternteil im Elternbereich fest
+  canSetPin?: boolean
+  onSetPin: (p: string) => void
+  onOk: () => void
+  onBack: () => void
+}) {
   const [val, setVal] = useState('')
   const [err, setErr] = useState('')
   const submit = () => {
@@ -24,6 +39,19 @@ export function PinGate({ pin, name, onSetPin, onOk, onBack }: { pin: string | n
     } else if (val === pin) onOk()
     else setErr('Die PIN stimmt nicht.')
   }
+  if (!pin && !canSetPin)
+    return (
+      <Screen
+        foot={
+          <button className="btn sec" onClick={onBack}>
+            Zurück
+          </button>
+        }
+      >
+        <div className="s-title">Familienbereich</div>
+        <p>Hier gibt es noch keine Eltern-PIN. Ein Elternteil legt sie im Elternbereich fest.</p>
+      </Screen>
+    )
   return (
     <Screen
       foot={
@@ -57,16 +85,17 @@ interface FamilyProps {
   child: Child
   family: FamilyInfo
   setFamily: (fn: (f: FamilyInfo) => FamilyInfo) => void
-  onAssignDevice: (id: string) => void
+  onAssignDevice?: (id: string) => void
   saved: Saved
   cloud: CloudState
   lessons: Record<string, Lesson>
   onArchive: (ids: string[]) => void
   onRestore: (id: string) => void
   onBack: () => void
+  backLabel?: string
 }
 
-export function Family({ packText, child, family, setFamily, onAssignDevice, saved, cloud, lessons, onArchive, onRestore, onBack }: FamilyProps) {
+export function Family({ backLabel, packText, child, family, setFamily, onAssignDevice, saved, cloud, lessons, onArchive, onRestore, onBack }: FamilyProps) {
   // Welche Aufgabe gerade auf „Wirklich zurücksetzen?“ wartet: eine Id oder „alle“
   const [asking, setAsking] = useState<string | null>(null)
   const current = saved.attempts.filter((a) => !a.archivedAt)
@@ -152,7 +181,7 @@ export function Family({ packText, child, family, setFamily, onAssignDevice, sav
     <Screen
       foot={
         <button className="btn sec" onClick={onBack}>
-          Zurück zu {genitive(child.name)} Ansicht
+          {backLabel ?? `Zurück zu ${genitive(child.name)} Ansicht`}
         </button>
       }
     >
@@ -271,7 +300,7 @@ export function Family({ packText, child, family, setFamily, onAssignDevice, sav
             ))}
         </ul>
       </details>
-      <ChildrenCard family={family} current={child.id} setFamily={setFamily} onAssignDevice={onAssignDevice} />
+      {onAssignDevice && <ChildrenCard family={family} current={child.id} setFamily={setFamily} onAssignDevice={onAssignDevice} />}
     </Screen>
   )
 }
