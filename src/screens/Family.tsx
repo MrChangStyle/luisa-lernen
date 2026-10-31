@@ -53,6 +53,7 @@ export function PinGate({ pin, name, onSetPin, onOk, onBack }: { pin: string | n
 }
 
 interface FamilyProps {
+  packText: string | null
   child: Child
   family: FamilyInfo
   setFamily: (fn: (f: FamilyInfo) => FamilyInfo) => void
@@ -65,7 +66,7 @@ interface FamilyProps {
   onBack: () => void
 }
 
-export function Family({ child, family, setFamily, onAssignDevice, saved, cloud, lessons, onArchive, onRestore, onBack }: FamilyProps) {
+export function Family({ packText, child, family, setFamily, onAssignDevice, saved, cloud, lessons, onArchive, onRestore, onBack }: FamilyProps) {
   // Welche Aufgabe gerade auf „Wirklich zurücksetzen?“ wartet: eine Id oder „alle“
   const [asking, setAsking] = useState<string | null>(null)
   const current = saved.attempts.filter((a) => !a.archivedAt)
@@ -166,6 +167,7 @@ export function Family({ child, family, setFamily, onAssignDevice, saved, cloud,
           }[cloud]
         }
       </p>
+      {packText && <p className="mini">{packText}</p>}
       <section className="card mood-row">
         {todayMood ? <Face value={todayMood.value} size={56} /> : <span className="mini">–</span>}
         <div>

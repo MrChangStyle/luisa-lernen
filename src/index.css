@@ -195,3 +195,13 @@ details.fold .card { border: 0; padding: 0; }
 .child-form label.check { display: flex; gap: 10px; align-items: flex-start; }
 .child-form label.check input { width: 22px; height: 22px; margin-top: 2px; flex: none; accent-color: var(--accent); }
 .read-aloud { justify-self: start; width: fit-content; }
+
+/* Mengenbilder (Hilfe „Zahlen mit Bild“) */
+.visual { margin: 0; display: grid; gap: 4px; justify-items: start; color: var(--ink); }
+.visual figcaption { font-size: .8rem; color: var(--muted); }
+.tenframes { display: flex; flex-wrap: wrap; gap: 6px; }
+.dot { fill: none; stroke: currentColor; stroke-opacity: .3; }
+.dot.on { fill: var(--accent); stroke: var(--accent); stroke-opacity: 1; }
+.placevalue { border-collapse: collapse; font-size: 1.1rem; font-variant-numeric: tabular-nums; }
+.placevalue th, .placevalue td { border: 1px solid var(--line); min-width: 40px; height: 34px; text-align: center; }
+.placevalue th { background: var(--accent-soft); color: var(--accent); }

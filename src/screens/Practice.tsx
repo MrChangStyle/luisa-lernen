@@ -2,11 +2,11 @@ import { useState } from 'react'
 import { Inline } from '../components/Rich'
 import { move } from '../logic/selection'
 import { Screen } from '../components/Ui'
-import { SUBJECTS } from '../data/subjects'
-import type { Lesson, Page } from '../types'
+import type { Lesson, Page, Topic } from '../types'
 import type { Attempt, LessonEntry } from '../state'
 
 interface MenuProps {
+  subjects: Record<string, Topic[]>
   selection: string[]
   openCount: number
   photoCount: number
@@ -15,7 +15,7 @@ interface MenuProps {
   go: (s: 'selection' | 'open' | 'photos' | 'lessons' | 'home') => void
 }
 
-export function PracticeMenu({ selection, openCount, photoCount, lessonCount, onSubject, go }: MenuProps) {
+export function PracticeMenu({ subjects, selection, openCount, photoCount, lessonCount, onSubject, go }: MenuProps) {
   const item = (to: 'selection' | 'open' | 'photos' | 'lessons', title: string, sub: string, n: number) => (
     <button className="card tap" onClick={() => go(to)}>
       <span className="row-between">
@@ -36,7 +36,7 @@ export function PracticeMenu({ selection, openCount, photoCount, lessonCount, on
       <div className="s-title">Meine Übungen</div>
       <p className="q">Wähle ein Fach:</p>
       <div className="grid2">
-        {Object.entries(SUBJECTS).map(([name, topics]) => (
+        {Object.entries(subjects).map(([name, topics]) => (
           <button key={name} className="card tap" onClick={() => onSubject(name)}>
             <b>{name}</b>
             <span className="mini">
@@ -55,6 +55,7 @@ export function PracticeMenu({ selection, openCount, photoCount, lessonCount, on
 }
 
 interface SubjectProps {
+  subjects: Record<string, Topic[]>
   subject: string
   selection: string[]
   practiced: Set<string>
@@ -64,7 +65,7 @@ interface SubjectProps {
   onBack: () => void
 }
 
-export function SubjectScreen({ subject, selection, practiced, onStart, onToggle, onSubject, onBack }: SubjectProps) {
+export function SubjectScreen({ subjects, subject, selection, practiced, onStart, onToggle, onSubject, onBack }: SubjectProps) {
   return (
     <Screen
       foot={
@@ -75,14 +76,14 @@ export function SubjectScreen({ subject, selection, practiced, onStart, onToggle
     >
       <div className="s-title">{subject}</div>
       <div className="chips tabs" role="tablist">
-        {Object.keys(SUBJECTS).map((k) => (
+        {Object.keys(subjects).map((k) => (
           <button key={k} role="tab" aria-selected={k === subject} className={`chip small${k === subject ? ' on' : ''}`} onClick={() => onSubject(k)}>
             {k}
           </button>
         ))}
       </div>
       <p className="mini">Tippe auf ein Thema, dann startet eine Übung. Mit dem Knopf rechts legst du das Thema in „Meine Auswahl“.</p>
-      {SUBJECTS[subject].map((t) => {
+      {(subjects[subject] ?? []).map((t) => {
         const on = selection.includes(t.name)
         const done = practiced.has(t.name)
         return (

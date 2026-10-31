@@ -1,0 +1,48 @@
+// Beispiel-Antwort der KI für eine Paket-Aufgabe (Mathe Klasse 3), wie sie der Generator erwartet
+export const PACK_AI = {
+  readable: true,
+  problem: '',
+  subject: 'Mathe',
+  topic: 'Schriftliche Addition',
+  source: 'Übung',
+  task: 'Im Zoo sind am Montag 345 Besucher. Am Dienstag kommen 230 Besucher. Wie viele Besucher sind es an beiden Tagen zusammen?',
+  final_result: '575',
+  parent_solution: '345 + 230 = 575',
+  glossary: [{ term: 'Einer', definition: 'Die Stelle ganz rechts in einer Zahl.' }],
+  steps: [
+    {
+      title: 'Was ist gefragt?',
+      why: 'Zuerst klären wir, welche Rechenart passt.',
+      worte: 'Die Frage will wissen, wie viele Besucher es **zusammen** sind.',
+      bild: 'Stell dir zwei Gruppen von Menschen vor. Sie stellen sich in eine Reihe.',
+      regel: '**Regel:** Zusammen heißt Plus.',
+      leicht: 'Es geht um zwei Tage. Wir zählen beide Tage zusammen.',
+      visual: { kind: 'stellenwert', zahl: 0, von: 0, bis: 0, schritt: 0, markiert: [], zahlen: [345, 230] },
+      check: { kind: 'choice', question: 'Welche Rechenart brauchst du?', options: ['+', '−'], answers: ['+'], ok_text: 'Das passt.', hint: '„{x}“ passt nicht.' },
+    },
+    {
+      title: 'Die Einer',
+      why: 'Wir rechnen von rechts nach links.',
+      worte: 'Rechne zuerst die [[Einer]]: 5 und 0.',
+      bild: 'Die Einer sind die kleinste Stelle.',
+      regel: '**Regel:** Beginne bei den Einern.',
+      leicht: 'Schau auf die Einer. Das sind 5 und 0.',
+      visual: { kind: 'keins', zahl: 0, von: 0, bis: 0, schritt: 0, markiert: [], zahlen: [] },
+      check: { kind: 'value', question: 'Was ergibt 5 + 0?', options: [], answers: ['5'], ok_text: 'Das passt.', hint: 'Schau nochmal.' },
+    },
+    {
+      title: 'Alles zusammen',
+      why: 'Jetzt rechnest du die ganze Aufgabe.',
+      worte: 'Rechne auch Zehner und Hunderter und schreibe das Ergebnis auf.',
+      bild: 'Jede Stelle bekommt ihr eigenes Fach.',
+      regel: '**Regel:** Stelle für Stelle addieren.',
+      leicht: 'Rechne jede Stelle. Schreibe die Zahl auf.',
+      visual: { kind: 'zahlenstrahl', zahl: 0, von: 0, bis: 1000, schritt: 100, markiert: [345], zahlen: [] },
+      check: { kind: 'value', question: 'Wie viele Besucher sind es zusammen?', options: [], answers: ['575'], ok_text: 'Das passt.', hint: 'Prüfe jede Stelle.' },
+    },
+  ],
+  practice: [
+    { text: 'Rechne 412 + 156.', note: 'Andere Zahlen.' },
+    { text: 'Rechne 230 + 524.', note: 'Andere Zahlen.' },
+  ],
+}

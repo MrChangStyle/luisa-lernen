@@ -1,0 +1,45 @@
+name: Inhaltspaket erstellen
+# Startet von Hand (Actions → „Inhaltspaket erstellen“ → Run workflow). Braucht das Repository-Secret ANTHROPIC_API_KEY.
+# Erstellt die Aufgaben mit der KI und legt sie als Pull Request zum Prüfen vor. Nichts geht ohne Mergen live.
+on:
+  workflow_dispatch:
+    inputs:
+      paket:
+        description: 'Paket, z. B. gs-3-mathe'
+        required: true
+        default: gs-3-mathe
+      anzahl:
+        description: 'Aufgaben pro Thema (1 bis 9)'
+        required: true
+        default: '6'
+permissions:
+  contents: write
+  pull-requests: write
+jobs:
+  erstellen:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Aufgaben erstellen
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: npm run inhalte -- "${{ inputs.paket }}" "${{ inputs.anzahl }}" | tee bericht.txt
+      - name: Als Pull Request vorlegen
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          branch="inhalte/${{ inputs.paket }}-${{ github.run_id }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$branch"
+          git add "public/inhalte/${{ inputs.paket }}.json"
+          git commit -m "Inhaltspaket ${{ inputs.paket }}"
+          git push -u origin "$branch"
+          { echo "Inhaltspaket **${{ inputs.paket }}**, automatisch erstellt. Bitte Stichproben prüfen, bevor es live geht."; echo; echo '```'; tail -n 30 bericht.txt; echo '```'; } > body.md
+          gh pr create --title "Inhaltspaket ${{ inputs.paket }}" --body-file body.md --base main --head "$branch" || echo "PR konnte nicht automatisch erstellt werden. Branch: $branch"

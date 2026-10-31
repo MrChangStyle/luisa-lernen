@@ -1,13 +1,21 @@
 // Ein Lernpfad ist genau das Datenpaket aus dem Konzept: Schritte mit je drei Fassungen.
 // Der Server (api/lesson.ts) erstellt ihn mit der KI aus Luisas Foto oder einem Thema.
 
-export type VersionKey = 'worte' | 'bild' | 'regel'
+// leicht: Fassung in Leichter Sprache, nur in Inhaltspaketen; die App zeigt sie bei der Hilfe „Leichte Sprache“ zuerst
+export type VersionKey = 'worte' | 'bild' | 'regel' | 'leicht'
 
 export const VERSION_LABEL: Record<VersionKey, string> = {
   worte: 'Mit anderen Worten',
   bild: 'Mit einem Bild',
   regel: 'Als feste Regel',
+  leicht: 'In Leichter Sprache',
 }
+
+// Mengenbild, das die App selbst zeichnet (Hilfe „Zahlen mit Bild“). Zeigt nur Zahlen aus der Aufgabe, nie ein Ergebnis.
+export type Visual =
+  | { kind: 'zehnerfeld'; zahl: number }
+  | { kind: 'zahlenstrahl'; von: number; bis: number; schritt: number; markiert: number[] }
+  | { kind: 'stellenwert'; zahlen: number[] }
 
 export type Graphic = { kind: 'pizza'; parts: { slices: number; filled: number; caption: string }[] }
 
@@ -45,6 +53,9 @@ export type Check =
 export interface Step {
   title: string
   versions: Version[]
+  // nur in Inhaltspaketen: Erklärung in Leichter Sprache und Mengenbild
+  easy?: string
+  visual?: Visual
   why: string
   check: Check
 }
@@ -131,4 +142,27 @@ export interface Saved {
   // Kennung des Neustarts (ISO-Zeit). Nach einem Zurücksetzen der Familie gewinnt der neuere Neustart ganz,
   // damit Geräte mit altem Stand die gelöschten Daten nicht wieder hochladen.
   start?: string
+}
+
+// Fertiges Inhaltspaket für ein Schuljahr und Fach (public/inhalte/<id>.json). Für alle Kinder gleich,
+// ohne persönliche Daten. Das Gerät lädt es einmal und speichert es für die Nutzung ohne Internet.
+export interface PackLesson extends Lesson {
+  level: 1 | 2 | 3
+}
+
+export interface PackTopic {
+  name: string
+  area: string
+  lessons: PackLesson[]
+}
+
+export interface ContentPackage {
+  id: string
+  version: string
+  title: string
+  grade: number
+  school: string
+  subject: string
+  createdAt: string
+  topics: PackTopic[]
 }

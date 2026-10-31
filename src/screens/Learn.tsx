@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Pizza } from '../components/Art'
+import { VisualView } from '../components/Visuals'
 import { Frac, Inline, Rich } from '../components/Rich'
 import { HenniSays, Ladder, Screen } from '../components/Ui'
 import { GLOSSARY } from '../data/glossary'
@@ -199,6 +200,8 @@ interface StepProps {
   onStop: () => void
   // Hilfe „Vorlesen“: Henni liest die Erklärung vor
   readAloud?: boolean
+  // Hilfe „Zahlen mit Bild“: Mengenbild immer zeigen (sonst nur bei der Fassung „Mit einem Bild“)
+  showVisual?: boolean
 }
 
 function ReadAloud({ text }: { text: string }) {
@@ -248,7 +251,7 @@ function Earlier({ lesson, index, results, onGoTo }: { lesson: Lesson; index: nu
   )
 }
 
-export function StepScreen({ lesson, index, version, results, onGoTo, onAgain, onResult, onNext, onStop, readAloud }: StepProps) {
+export function StepScreen({ lesson, index, version, results, onGoTo, onAgain, onResult, onNext, onStop, readAloud, showVisual }: StepProps) {
   const result = results[index] ?? null
   const step = lesson.steps[index]
   const v = step.versions[version]
@@ -306,6 +309,7 @@ export function StepScreen({ lesson, index, version, results, onGoTo, onAgain, o
             ))}
           </div>
         )}
+        {step.visual && (showVisual || v.key === 'bild') && <VisualView v={step.visual} />}
         <div className="explain">
           <Rich text={v.text} onTerm={(t) => setTerm(term === t ? null : t)} />
         </div>
