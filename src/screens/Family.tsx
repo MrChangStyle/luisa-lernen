@@ -56,6 +56,7 @@ interface FamilyProps {
   child: Child
   family: FamilyInfo
   setFamily: (fn: (f: FamilyInfo) => FamilyInfo) => void
+  onAssignDevice: (id: string) => void
   saved: Saved
   cloud: CloudState
   lessons: Record<string, Lesson>
@@ -64,7 +65,7 @@ interface FamilyProps {
   onBack: () => void
 }
 
-export function Family({ child, family, setFamily, saved, cloud, lessons, onArchive, onRestore, onBack }: FamilyProps) {
+export function Family({ child, family, setFamily, onAssignDevice, saved, cloud, lessons, onArchive, onRestore, onBack }: FamilyProps) {
   // Welche Aufgabe gerade auf „Wirklich zurücksetzen?“ wartet: eine Id oder „alle“
   const [asking, setAsking] = useState<string | null>(null)
   const current = saved.attempts.filter((a) => !a.archivedAt)
@@ -268,7 +269,7 @@ export function Family({ child, family, setFamily, saved, cloud, lessons, onArch
             ))}
         </ul>
       </details>
-      <ChildrenCard family={family} current={child.id} setFamily={setFamily} />
+      <ChildrenCard family={family} current={child.id} setFamily={setFamily} onAssignDevice={onAssignDevice} />
     </Screen>
   )
 }

@@ -1,9 +1,8 @@
 import { useState } from 'react'
 import App from './App'
-import { ChildPicker } from './screens/Children'
 import { useFamily } from './state'
 
-// Welches Kind auf diesem Gerät gerade lernt. Ohne Wahl: Luisa (bisheriges Verhalten).
+// Jedes Gerät gehört genau einem Kind. Es kennt nur dessen Stand. Ohne Zuordnung: Luisa (bisheriges Verhalten).
 const ACTIVE_KEY = 'luisa-lernen:aktiv'
 
 function loadActive() {
@@ -17,25 +16,16 @@ function loadActive() {
 export default function Root() {
   const [family, setFamily] = useFamily()
   const [active, setActive] = useState(loadActive)
-  const [picking, setPicking] = useState(false)
   const child = family.children.find((c) => c.id === active) ?? family.children[0]
-
-  if (picking)
-    return (
-      <ChildPicker
-        children={family.children}
-        onPick={(id) => {
-          try {
-            localStorage.setItem(ACTIVE_KEY, id)
-          } catch {
-            // Wahl gilt dann nur bis zum Neuladen
-          }
-          setActive(id)
-          setPicking(false)
-        }}
-        onBack={() => setPicking(false)}
-      />
-    )
+  // Nur im Familienbereich (hinter der Eltern-PIN): dieses Gerät einem anderen Kind zuordnen
+  const assignDevice = (id: string) => {
+    try {
+      localStorage.setItem(ACTIVE_KEY, id)
+    } catch {
+      // Zuordnung gilt dann nur bis zum Neuladen
+    }
+    setActive(id)
+  }
   // key: Beim Wechsel wird die App neu aufgebaut, damit sich die Stände der Kinder nie vermischen
-  return <App key={child.id} child={child} family={family} setFamily={setFamily} onSwitch={family.children.length > 1 ? () => setPicking(true) : undefined} />
+  return <App key={child.id} child={child} family={family} setFamily={setFamily} onAssignDevice={assignDevice} />
 }

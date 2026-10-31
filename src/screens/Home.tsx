@@ -4,7 +4,6 @@ import { moodText } from '../logic/mood'
 
 interface Props {
   name: string
-  onSwitch?: () => void
   mood: number
   moodSavedAt: string | null
   moodEgg: boolean
@@ -13,7 +12,7 @@ interface Props {
   go: (s: 'camera' | 'practice' | 'farm' | 'family') => void
 }
 
-export function Home({ name, onSwitch, mood, moodSavedAt, moodEgg, onMood, onConfirmMood, go }: Props) {
+export function Home({ name, mood, moodSavedAt, moodEgg, onMood, onConfirmMood, go }: Props) {
   return (
     <Screen
       foot={
@@ -29,11 +28,6 @@ export function Home({ name, onSwitch, mood, moodSavedAt, moodEgg, onMood, onCon
               Mein Bauernhof
             </button>
           </div>
-          {onSwitch && (
-            <button className="link" onClick={onSwitch}>
-              Anderes Kind wählen
-            </button>
-          )}
           <button className="link" onClick={() => go('family')}>
             Familienbereich (für Eltern)
           </button>

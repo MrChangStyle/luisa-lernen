@@ -51,12 +51,12 @@ interface AppProps {
   child: Child
   family: FamilyInfo
   setFamily: (fn: (f: FamilyInfo) => FamilyInfo) => void
-  // nur gesetzt, wenn es mehr als ein Kind gibt
-  onSwitch?: () => void
+  // Familienbereich: dieses Gerät einem anderen Kind zuordnen
+  onAssignDevice: (id: string) => void
 }
 
 // Die App eines Kindes. Root baut sie pro Kind neu auf, damit sich die Stände nie vermischen.
-export default function App({ child, family, setFamily, onSwitch }: AppProps) {
+export default function App({ child, family, setFamily, onAssignDevice }: AppProps) {
   const [saved, setSaved, cloud] = useSaved(child.id)
   const learner = learnerOf(child)
   // Gemeinsame Eltern-PIN; ältere Stände haben sie noch in Luisas Lernstand
@@ -282,7 +282,6 @@ export default function App({ child, family, setFamily, onSwitch }: AppProps) {
       return (
         <Home
           name={child.name}
-          onSwitch={onSwitch}
           mood={mood}
           moodSavedAt={todayMood ? clock(todayMood.at) : null}
           moodEgg={!!todayMood?.egg}
@@ -425,7 +424,7 @@ export default function App({ child, family, setFamily, onSwitch }: AppProps) {
         />
       )
     case 'family':
-      return <Family child={child} family={family} setFamily={setFamily} saved={saved} cloud={cloud} lessons={lessons} onArchive={(ids) => setSaved((s) => archiveAttempts(s, ids))}
+      return <Family child={child} family={family} setFamily={setFamily} onAssignDevice={onAssignDevice} saved={saved} cloud={cloud} lessons={lessons} onArchive={(ids) => setSaved((s) => archiveAttempts(s, ids))}
           onRestore={(id) => setSaved((s) => restoreAttempt(s, id))} onBack={() => setScreen('home')} />
   }
 }

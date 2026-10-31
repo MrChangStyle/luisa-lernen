@@ -194,6 +194,4 @@ details.fold .card { border: 0; padding: 0; }
 .child-form input:not([type]), .child-form select { font: inherit; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--paper); color: var(--ink); width: 100%; box-sizing: border-box; }
 .child-form label.check { display: flex; gap: 10px; align-items: flex-start; }
 .child-form label.check input { width: 22px; height: 22px; margin-top: 2px; flex: none; accent-color: var(--accent); }
-.pick-child { display: flex !important; align-items: center; gap: 14px; font-size: 1.15rem; }
-.pick-child .initial { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; background: var(--accent-soft); color: var(--accent); font-weight: 800; }
 .read-aloud { justify-self: start; width: fit-content; }

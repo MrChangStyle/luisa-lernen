@@ -1,9 +1,19 @@
 import { useState } from 'react'
-import { Screen } from '../components/Ui'
-import { HELP_KEYS, HELPS, PROFILES, SCHOOLS, type Child, type FamilyInfo, type HelpKey } from '../logic/learner'
+import { HELP_KEYS, HELPS, PROFILES, SCHOOLS, genitive, type Child, type FamilyInfo, type HelpKey } from '../logic/learner'
 
 // Familienbereich: Kinder anlegen und ihre Hilfen einstellen. Gespeichert werden nur die Hilfen, keine Diagnose.
-export function ChildrenCard({ family, current, setFamily }: { family: FamilyInfo; current: string; setFamily: (fn: (f: FamilyInfo) => FamilyInfo) => void }) {
+export function ChildrenCard({
+  family,
+  current,
+  setFamily,
+  onAssignDevice,
+}: {
+  family: FamilyInfo
+  current: string
+  setFamily: (fn: (f: FamilyInfo) => FamilyInfo) => void
+  onAssignDevice: (id: string) => void
+}) {
+  const [assigning, setAssigning] = useState<string | null>(null)
   const [editing, setEditing] = useState<string | null>(null)
   const save = (c: Child) => {
     setFamily((f) => ({
@@ -27,7 +37,7 @@ export function ChildrenCard({ family, current, setFamily }: { family: FamilyInf
             <div className="row-between">
               <b>
                 {c.name}
-                {c.id === current && <span className="mini"> (gerade geöffnet)</span>}
+                {c.id === current && <span className="mini"> (dieses Gerät)</span>}
               </b>
               <span className="mini">
                 {c.grade}. Klasse · {c.school}
@@ -37,6 +47,24 @@ export function ChildrenCard({ family, current, setFamily }: { family: FamilyInf
             <button className="btn sec slim" onClick={() => setEditing(c.id)}>
               Ändern
             </button>
+            {c.id !== current &&
+              (assigning === c.id ? (
+                <div className="fb no stack" role="alertdialog">
+                  <span>Dieses Gerät gehört danach {c.name}. Hier sind dann nur noch {genitive(c.name)} Aufgaben und Bauernhof zu sehen. Die Daten der anderen Kinder bleiben erhalten.</span>
+                  <div className="row2">
+                    <button className="btn slim" onClick={() => onAssignDevice(c.id)}>
+                      Ja, Gerät zuordnen
+                    </button>
+                    <button className="btn sec slim" onClick={() => setAssigning(null)}>
+                      Abbrechen
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button className="btn sec slim" onClick={() => setAssigning(c.id)}>
+                  Dieses Gerät {c.name} geben
+                </button>
+              ))}
           </section>
         ),
       )}
@@ -47,7 +75,7 @@ export function ChildrenCard({ family, current, setFamily }: { family: FamilyInf
           Kind hinzufügen
         </button>
       )}
-      <p className="mini">Jedes Kind hat seinen eigenen Bauernhof, seine eigenen Aufgaben und seinen eigenen Verlauf. Die Eltern-PIN gilt für alle Kinder.</p>
+      <p className="mini">Jedes Kind lernt auf seinem eigenen Gerät und sieht nur seine eigenen Aufgaben, seinen Bauernhof und seinen Verlauf. Ein neues Kind bekommt ein Gerät über „Dieses Gerät … geben“. Die Eltern-PIN gilt für alle Kinder.</p>
     </details>
   )
 }
@@ -123,30 +151,5 @@ function ChildForm({ start, onSave, onCancel }: { start: Child; onSave: (c: Chil
         </button>
       </div>
     </section>
-  )
-}
-
-// Auswahl beim Wechseln: Jedes Kind tippt auf seinen Namen. Das Gerät merkt sich die Wahl.
-export function ChildPicker({ children, onPick, onBack }: { children: Child[]; onPick: (id: string) => void; onBack: () => void }) {
-  return (
-    <Screen
-      foot={
-        <button className="btn sec" onClick={onBack}>
-          Zurück
-        </button>
-      }
-    >
-      <div className="s-title">Wer lernt jetzt?</div>
-      <div className="stack">
-        {children.map((c) => (
-          <button key={c.id} className="card tap pick-child" onClick={() => onPick(c.id)}>
-            <span className="initial" aria-hidden="true">
-              {c.name.slice(0, 1).toUpperCase()}
-            </span>
-            <b>{c.name}</b>
-          </button>
-        ))}
-      </div>
-    </Screen>
   )
 }
