@@ -3,6 +3,7 @@ import { HenniSays, Screen } from '../components/Ui'
 import { moodText } from '../logic/mood'
 
 interface Props {
+  name: string
   mood: number
   moodSavedAt: string | null
   moodEgg: boolean
@@ -11,7 +12,7 @@ interface Props {
   go: (s: 'camera' | 'practice' | 'farm' | 'family') => void
 }
 
-export function Home({ mood, moodSavedAt, moodEgg, onMood, onConfirmMood, go }: Props) {
+export function Home({ name, mood, moodSavedAt, moodEgg, onMood, onConfirmMood, go }: Props) {
   return (
     <Screen
       foot={
@@ -34,7 +35,7 @@ export function Home({ mood, moodSavedAt, moodEgg, onMood, onConfirmMood, go }: 
       }
     >
       <HenniSays big>
-        <div className="s-title small">Hallo Luisa.</div>
+        <div className="s-title small">Hallo {name}.</div>
         <div>Ich bin Henni, dein Lehrerhuhn. Ich erkläre dir heute deine Aufgaben, Schritt für Schritt.</div>
       </HenniSays>
       <section className="card mood">

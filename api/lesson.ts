@@ -1,7 +1,8 @@
 import Anthropic from '@anthropic-ai/sdk'
 import type { Check, Lesson, Step } from '../src/types.js'
+import { LUISA, learnerIntro, parseLearner, type Learner } from '../src/logic/learner.js'
 
-// Erstellt einen Lernpfad mit Claude: aus Luisas Foto, aus einem Thema oder aus einer Übungsaufgabe.
+// Erstellt einen Lernpfad mit Claude: aus dem Foto des Kindes, aus einem Thema oder aus einer Übungsaufgabe.
 // Der Wächter (findLeaks) prüft danach, dass kein Ergebnis in den Erklärungen steht.
 // Diese Datei bleibt bewusst eigenständig, weil Vercel sie einzeln als Funktion baut.
 
@@ -71,16 +72,18 @@ export const OUTPUT_SCHEMA = obj({
   practice: { type: 'array', items: obj({ text: str, note: str }) },
 })
 
-export const SYSTEM_PROMPT = `Du bist „Henni“, ein freundliches Lehrerhuhn in einer Lern-App. Du erklärst Luisa Schulaufgaben Schritt für Schritt. Luisa ist 12 Jahre alt, Autistin und geht in die 6. Klasse einer Mittelschule in Bayern (LehrplanPLUS). Sie braucht klare, logische Erklärungen, die sie nachvollziehen kann.
+export const systemPrompt = (l: Learner = LUISA) => {
+  const n = l.name
+  return `Du bist „Henni“, ein freundliches Lehrerhuhn in einer Lern-App. Du erklärst ${n} Schulaufgaben Schritt für Schritt. ${learnerIntro(l)}
 
 Die wichtigste Regel: Du verrätst nie ein Ergebnis.
-- Weder das Endergebnis noch das Ergebnis eines Schritts steht in einer Erklärung (worte, bild, regel), im Feld why, in der Frage oder im Hinweis. Luisa findet jedes Ergebnis selbst.
+- Weder das Endergebnis noch das Ergebnis eines Schritts steht in einer Erklärung (worte, bild, regel), im Feld why, in der Frage oder im Hinweis. ${n} findet jedes Ergebnis selbst.
 - Zahlenreihen fängst du nur an („4, 8, …“) und hörst auf, bevor der gesuchte Wert kommt.
 - Statt das Ergebnis zu nennen, zeigst du den Weg dorthin.
 
 So baust du den Lernpfad:
 - 3 bis 6 Schritte. Ein Schritt ist genau ein Gedanke. Der erste Schritt klärt, was gefragt ist.
-- Jeder Schritt endet mit einer Prüffrage (check), deren Antwort Luisa selbst herausfindet. Der letzte Schritt fragt das Endergebnis ab, wenn es eins gibt. Hat die Aufgabe kein eindeutiges Ergebnis (zum Beispiel einen Text schreiben), prüft der letzte Schritt ein klares Merkmal.
+- Jeder Schritt endet mit einer Prüffrage (check), deren Antwort ${n} selbst herausfindet. Der letzte Schritt fragt das Endergebnis ab, wenn es eins gibt. Hat die Aufgabe kein eindeutiges Ergebnis (zum Beispiel einen Text schreiben), prüft der letzte Schritt ein klares Merkmal.
 - Jeder Schritt hat drei Fassungen derselben Erklärung. Jede Fassung ist für sich allein verständlich:
   worte: mit anderen, einfachen Worten.
   bild: mit einem konkreten Bild aus dem Alltag, das man sich vorstellen kann (Pizza, Lineal, Schrank mit Fächern …).
@@ -95,48 +98,49 @@ Sprache:
 
 Prüffragen (check):
 - kind "choice": 2 bis 4 options. answers enthält genau die richtige Option, Zeichen für Zeichen wie in options.
-- kind "value": Luisa tippt eine kurze Antwort (eine Zahl oder ein bis drei Wörter, nie einen Satz). answers enthält alle richtigen Schreibweisen, zum Beispiel ["0,5", "0.5"] oder ["dass"]. options ist leer.
-- kind "fraction": Luisa tippt Zähler und Nenner. answers enthält genau einen Bruch als "Zähler/Nenner", zum Beispiel ["11/12"]. options ist leer.
-- hint: ein sachlicher Hinweis für eine falsche Eingabe, der zum Nachdenken führt, ohne die Lösung zu nennen. {x} steht für Luisas Eingabe.
-- ok_text: eine sachliche Bestätigung, zum Beispiel „Das passt. Der Nenner ist jetzt bei beiden Brüchen gleich.“ Hier darf das Ergebnis stehen, weil Luisa es schon gefunden hat.
-- Rechne jede Antwort sorgfältig nach. Eine falsche Antwort in answers verwirrt Luisa sehr.
+- kind "value": ${n} tippt eine kurze Antwort (eine Zahl oder ein bis drei Wörter, nie einen Satz). answers enthält alle richtigen Schreibweisen, zum Beispiel ["0,5", "0.5"] oder ["dass"]. options ist leer.
+- kind "fraction": ${n} tippt Zähler und Nenner. answers enthält genau einen Bruch als "Zähler/Nenner", zum Beispiel ["11/12"]. options ist leer.
+- hint: ein sachlicher Hinweis für eine falsche Eingabe, der zum Nachdenken führt, ohne die Lösung zu nennen. {x} steht für die Eingabe von ${n}.
+- ok_text: eine sachliche Bestätigung, zum Beispiel „Das passt. Der Nenner ist jetzt bei beiden Brüchen gleich.“ Hier darf das Ergebnis stehen, weil ${n} es schon gefunden hat.
+- Rechne jede Antwort sorgfältig nach. Eine falsche Antwort in answers verwirrt ${n} sehr.
 
 Weitere Felder:
 - task: die Aufgabe vollständig im Wortlaut, mit der Auszeichnung von oben.
 - source: woher die Aufgabe kommt, zum Beispiel „Aufgabe 4 (S. 37)“, wenn das auf dem Foto steht.
 - subject: eines der Fächer. topic: ein kurzer Themenname, zum Beispiel „Brüche addieren“.
-- final_result: das Endergebnis in Kurzform. Das sieht nur die App, nie Luisa.
+- final_result: das Endergebnis in Kurzform. Das sieht nur die App, nie ${n}.
 - parent_solution: der Lösungsweg in einer Zeile für die Eltern, zum Beispiel „1/4 + 2/3 = 3/12 + 8/12 = 11/12“.
 - practice: genau 2 neue Aufgaben zum selben Thema mit derselben Schwierigkeit und anderen Zahlen oder Wörtern, ohne Lösung. note sagt in einem Satz, was gleich oder anders ist.
 - readable ist true. problem ist leer.
 
-Nur bei einem Foto: Wenn das Foto nicht lesbar ist oder keine Schulaufgabe zeigt, setze readable auf false und schreibe in problem einen ruhigen Satz an Luisa, was sie tun kann (zum Beispiel „Das Foto ist zu dunkel. Mache bitte ein neues Foto mit mehr Licht.“). Alle anderen Texte sind dann leer und die Listen leer. Sind mehrere Aufgaben auf dem Foto, nimm die erste vollständig sichtbare und nenne sie in source.`
+Nur bei einem Foto: Wenn das Foto nicht lesbar ist oder keine Schulaufgabe zeigt, setze readable auf false und schreibe in problem einen ruhigen Satz an ${n} in der Du-Form, was zu tun ist (zum Beispiel „Das Foto ist zu dunkel. Mache bitte ein neues Foto mit mehr Licht.“). Alle anderen Texte sind dann leer und die Listen leer. Sind mehrere Aufgaben auf dem Foto, nimm die erste vollständig sichtbare und nenne sie in source.`
+}
 
-export function userContent(req: LessonRequest): Anthropic.Beta.BetaContentBlockParam[] {
+export function userContent(req: LessonRequest, l: Learner = LUISA): Anthropic.Beta.BetaContentBlockParam[] {
   switch (req.mode) {
     case 'photo':
       return [
         { type: 'image', source: { type: 'base64', media_type: req.mediaType, data: req.image } },
-        { type: 'text', text: 'Luisa hat diese Aufgabe aus der Schule fotografiert. Erstelle den Lernpfad dazu.' },
+        { type: 'text', text: `${l.name} hat diese Aufgabe aus der Schule fotografiert. Erstelle den Lernpfad dazu.` },
       ]
     case 'topic':
       return [
         {
           type: 'text',
-          text: `Luisa möchte selbstständig üben. Fach: ${req.subject}. Thema: ${req.topic}.\n\nDenke dir eine neue Übungsaufgabe aus, die zur 6. Klasse Mittelschule in Bayern passt, und erstelle den Lernpfad dazu. Alles, was Luisa zum Lösen braucht, steht in der Aufgabe selbst. source ist „Übung“. topic ist „${req.topic}“.`,
+          text: `${l.name} möchte selbstständig üben. Fach: ${req.subject}. Thema: ${req.topic}.\n\nDenke dir eine neue Übungsaufgabe aus, die zur ${l.grade}. Klasse ${l.school} in Bayern passt, und erstelle den Lernpfad dazu. Alles, was ${l.name} zum Lösen braucht, steht in der Aufgabe selbst. source ist „Übung“. topic ist „${req.topic}“.`,
         },
       ]
     case 'task':
       return [
         {
           type: 'text',
-          text: `Luisa möchte diese Übungsaufgabe lösen. Fach: ${req.subject}. Thema: ${req.topic}.\n\nAufgabe: ${req.text}\n\nErstelle den Lernpfad dazu. source ist „${req.source ?? 'Übung zu deinem Foto'}“. topic ist „${req.topic}“.`,
+          text: `${l.name} möchte diese Übungsaufgabe lösen. Fach: ${req.subject}. Thema: ${req.topic}.\n\nAufgabe: ${req.text}\n\nErstelle den Lernpfad dazu. source ist „${req.source ?? 'Übung zu deinem Foto'}“. topic ist „${req.topic}“.`,
         },
       ]
   }
 }
 
-// --- Wächter: kein Ergebnis in den Texten, die Luisa vor ihrer Eingabe sieht ---
+// --- Wächter: kein Ergebnis in den Texten, die das Kind vor seiner Eingabe sieht ---
 
 const plain = (s: string) =>
   s
@@ -236,23 +240,23 @@ export function toLesson(ai: AiLesson, id: string): Lesson {
 
 const MODEL = 'claude-opus-5-5'
 
-function send(client: Anthropic, messages: Anthropic.Beta.BetaMessageParam[], withFallback: boolean) {
+function send(client: Anthropic, messages: Anthropic.Beta.BetaMessageParam[], withFallback: boolean, system: string) {
   return client.beta.messages
     .stream({
       model: MODEL,
       max_tokens: 32000,
       ...(withFallback ? { betas: ['server-side-fallback-2026-07-01'], fallbacks: 'default' as const } : {}),
       output_config: { effort: 'medium', format: { type: 'json_schema', schema: OUTPUT_SCHEMA } },
-      system: SYSTEM_PROMPT,
+      system,
       messages,
     })
     .finalMessage()
 }
 
-async function ask(client: Anthropic, messages: Anthropic.Beta.BetaMessageParam[]) {
+async function ask(client: Anthropic, messages: Anthropic.Beta.BetaMessageParam[], system: string) {
   // Ersatzmodell bei Ablehnung; lehnt das Konto diese Einstellung ab, geht es ohne weiter
-  const message = await send(client, messages, true).catch((e) => {
-    if (e instanceof Anthropic.BadRequestError && /fallback/i.test(e.message)) return send(client, messages, false)
+  const message = await send(client, messages, true, system).catch((e) => {
+    if (e instanceof Anthropic.BadRequestError && /fallback/i.test(e.message)) return send(client, messages, false, system)
     throw e
   })
   if (message.stop_reason === 'refusal') throw new Error('Die KI hat diese Aufgabe abgelehnt.')
@@ -261,9 +265,10 @@ async function ask(client: Anthropic, messages: Anthropic.Beta.BetaMessageParam[
   return { message, ai: JSON.parse(text) as AiLesson }
 }
 
-export async function createLesson(client: Anthropic, req: LessonRequest): Promise<{ lesson: Lesson } | { problem: string }> {
-  const messages: Anthropic.Beta.BetaMessageParam[] = [{ role: 'user', content: userContent(req) }]
-  let { message, ai } = await ask(client, messages)
+export async function createLesson(client: Anthropic, req: LessonRequest, l: Learner = LUISA): Promise<{ lesson: Lesson } | { problem: string }> {
+  const messages: Anthropic.Beta.BetaMessageParam[] = [{ role: 'user', content: userContent(req, l) }]
+  const system = systemPrompt(l)
+  let { message, ai } = await ask(client, messages, system)
   if (!ai.readable) return { problem: ai.problem || 'Ich kann die Aufgabe auf dem Foto nicht lesen. Mache bitte ein neues Foto.' }
   let found = problems(ai)
   if (found.length) {
@@ -272,7 +277,7 @@ export async function createLesson(client: Anthropic, req: LessonRequest): Promi
       { role: 'assistant', content: message.content },
       { role: 'user', content: `Der Lernpfad passt so noch nicht:\n${found.join('\n')}\n\nSchreibe den ganzen Lernpfad noch einmal und behebe genau diese Punkte.` },
     )
-    ;({ message, ai } = await ask(client, messages))
+    ;({ message, ai } = await ask(client, messages, system))
     found = problems(ai)
     if (found.length) throw new Error(`Der Wächter hat den Lernpfad gestoppt: ${found.join(' ')}`)
   }
@@ -308,10 +313,13 @@ export async function POST(request: Request): Promise<Response> {
   if (!process.env.ANTHROPIC_API_KEY) {
     return json({ error: 'Die KI ist noch nicht eingerichtet. Ein Elternteil muss den Schlüssel bei Vercel eintragen.' }, 503)
   }
-  const req = parseRequest(await request.json().catch(() => null))
+  const body = await request.json().catch(() => null)
+  const req = parseRequest(body)
   if (!req) return json({ error: 'Die Anfrage war unvollständig.' }, 400)
+  // Ohne Angaben zum Kind (ältere App-Version) gilt Luisa
+  const learner = parseLearner((body as { learner?: unknown } | null)?.learner) ?? LUISA
   try {
-    return json(await createLesson(new Anthropic(), req))
+    return json(await createLesson(new Anthropic(), req, learner))
   } catch (e) {
     console.error(e)
     const text = e instanceof Anthropic.APIError ? 'Die KI ist gerade nicht erreichbar.' : e instanceof Error ? e.message : 'Unbekannter Fehler.'

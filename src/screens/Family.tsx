@@ -8,10 +8,12 @@ import { dayKey, moodText } from '../logic/mood'
 import { clock, dateLabel, type CloudState, type Saved } from '../state'
 import type { Lesson } from '../types'
 import { VERSION_LABEL } from '../types'
+import { genitive, type Child, type FamilyInfo } from '../logic/learner'
+import { ChildrenCard } from './Children'
 
-// In der Testversion schützt eine PIN auf dem Gerät den Bereich vor versehentlichem Öffnen.
-// Echte Eltern-Zugänge für Mama und Papa kommen mit der Datenbank.
-export function PinGate({ pin, onSetPin, onOk, onBack }: { pin: string | null; onSetPin: (p: string) => void; onOk: () => void; onBack: () => void }) {
+// Eine gemeinsame Eltern-PIN für alle Kinder schützt den Bereich vor versehentlichem Öffnen.
+// Echte Eltern-Zugänge per E-Mail kommen in einer späteren Stufe.
+export function PinGate({ pin, name, onSetPin, onOk, onBack }: { pin: string | null; name: string; onSetPin: (p: string) => void; onOk: () => void; onBack: () => void }) {
   const [val, setVal] = useState('')
   const [err, setErr] = useState('')
   const submit = () => {
@@ -36,7 +38,7 @@ export function PinGate({ pin, onSetPin, onOk, onBack }: { pin: string | null; o
       }
     >
       <div className="s-title">Familienbereich</div>
-      <p>{pin ? 'Bitte die Eltern-PIN eingeben.' : 'Lege eine 4-stellige Eltern-PIN fest. Luisa braucht sie nicht.'}</p>
+      <p>{pin ? 'Bitte die Eltern-PIN eingeben.' : `Lege eine 4-stellige Eltern-PIN fest. ${name} braucht sie nicht.`}</p>
       <form
         onSubmit={(e) => {
           e.preventDefault()
@@ -51,6 +53,11 @@ export function PinGate({ pin, onSetPin, onOk, onBack }: { pin: string | null; o
 }
 
 interface FamilyProps {
+  packText: string | null
+  child: Child
+  family: FamilyInfo
+  setFamily: (fn: (f: FamilyInfo) => FamilyInfo) => void
+  onAssignDevice: (id: string) => void
   saved: Saved
   cloud: CloudState
   lessons: Record<string, Lesson>
@@ -59,7 +66,7 @@ interface FamilyProps {
   onBack: () => void
 }
 
-export function Family({ saved, cloud, lessons, onArchive, onRestore, onBack }: FamilyProps) {
+export function Family({ packText, child, family, setFamily, onAssignDevice, saved, cloud, lessons, onArchive, onRestore, onBack }: FamilyProps) {
   // Welche Aufgabe gerade auf „Wirklich zurücksetzen?“ wartet: eine Id oder „alle“
   const [asking, setAsking] = useState<string | null>(null)
   const current = saved.attempts.filter((a) => !a.archivedAt)
@@ -67,7 +74,7 @@ export function Family({ saved, cloud, lessons, onArchive, onRestore, onBack }: 
   const ask = (what: string, question: string, ids: string[]) =>
     asking === what ? (
       <div className="fb no stack" role="alertdialog" aria-label={question}>
-        <span>{question} Sie kommt ins Archiv, nichts wird gelöscht. Luisas Bauernhof bleibt, wie er ist.</span>
+        <span>{question} Sie kommt ins Archiv, nichts wird gelöscht. {genitive(child.name)} Bauernhof bleibt, wie er ist.</span>
         <div className="row2">
           <button
             className="btn slim"
@@ -145,11 +152,11 @@ export function Family({ saved, cloud, lessons, onArchive, onRestore, onBack }: 
     <Screen
       foot={
         <button className="btn sec" onClick={onBack}>
-          Zurück zu Luisas Ansicht
+          Zurück zu {genitive(child.name)} Ansicht
         </button>
       }
     >
-      <div className="s-title">Familienbereich</div>
+      <div className="s-title">Familienbereich · {child.name}</div>
       <p className={`mini cloud ${cloud}`} role="status">
         {
           {
@@ -160,6 +167,7 @@ export function Family({ saved, cloud, lessons, onArchive, onRestore, onBack }: 
           }[cloud]
         }
       </p>
+      {packText && <p className="mini">{packText}</p>}
       <section className="card mood-row">
         {todayMood ? <Face value={todayMood.value} size={56} /> : <span className="mini">–</span>}
         <div>
@@ -204,7 +212,7 @@ export function Family({ saved, cloud, lessons, onArchive, onRestore, onBack }: 
         <span className="mini">Lernzeit zählt die Zeit vom Start bis zum Fertigmachen einer Aufgabe, höchstens 60 Minuten je Aufgabe.</span>
       </section>
       <section className="card stack">
-        <b>Luisas Bauernhof</b>
+        <b>{genitive(child.name)} Bauernhof</b>
         <Ladder farm={saved.farm} />
       </section>
       <details className="fold">
@@ -263,6 +271,7 @@ export function Family({ saved, cloud, lessons, onArchive, onRestore, onBack }: 
             ))}
         </ul>
       </details>
+      <ChildrenCard family={family} current={child.id} setFamily={setFamily} onAssignDevice={onAssignDevice} />
     </Screen>
   )
 }

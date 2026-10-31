@@ -11,10 +11,12 @@ import { Camera, Done, Problem, StepScreen, Waiting } from './screens/Learn'
 import { PageScreen, type TaskStatus } from './screens/Page'
 import { SUBJECTS } from './data/subjects'
 import { LessonsScreen, OpenScreen, PhotosScreen, PracticeMenu, SelectionScreen, SubjectScreen } from './screens/Practice'
+import { packageIdFor } from './data/packages'
+import { nextLesson, usePackage, withEasyFirst } from './logic/content'
+import { learnerOf, type Child, type FamilyInfo } from './logic/learner'
 import { archiveAttempts, clock, lessonOverview, passedBefore, restoreAttempt, useSaved, withEvent, withLesson, type Attempt } from './state'
-import { VERSION_LABEL, type Lesson, type Page } from './types'
+import { VERSION_LABEL, type Lesson, type Page, type Topic } from './types'
 
-const subjectOf = (topic: string) => Object.keys(SUBJECTS).find((k) => SUBJECTS[k].some((t) => t.name === topic)) ?? 'Mathe'
 
 // Ein Auftrag an die KI: was sie erstellen soll und wohin es danach geht
 // page-file: Foto einer Seite, die KI listet nur die Aufgaben darauf. Sonst erstellt sie einen Lernpfad.
@@ -46,15 +48,43 @@ type ScreenName =
   | 'pin'
   | 'family'
 
-export default function App() {
-  const [saved, setSaved, cloud] = useSaved()
+interface AppProps {
+  child: Child
+  family: FamilyInfo
+  setFamily: (fn: (f: FamilyInfo) => FamilyInfo) => void
+  // Familienbereich: dieses Gerät einem anderen Kind zuordnen
+  onAssignDevice: (id: string) => void
+}
+
+// Die App eines Kindes. Root baut sie pro Kind neu auf, damit sich die Stände nie vermischen.
+export default function App({ child, family, setFamily, onAssignDevice }: AppProps) {
+  const [saved, setSaved, cloud] = useSaved(child.id)
+  const learner = learnerOf(child)
+  // Gemeinsame Eltern-PIN; ältere Stände haben sie noch in Luisas Lernstand
+  const pin = family.pin ?? saved.parentPin
+  // Fertiges Inhaltspaket für Klasse und Schulart (z. B. Mathe Klasse 3). Ohne Paket erstellt die KI wie bisher.
+  const pack = usePackage(packageIdFor(child.school, child.grade))
+  const pkg = pack.state === 'ok' ? pack.pkg : null
+  const subjects: Record<string, Topic[]> = pkg ? { [pkg.subject]: pkg.topics.map((t) => ({ name: t.name, status: 'neu' })) } : SUBJECTS
+  const subjectOf = (topic: string) => Object.keys(subjects).find((k) => subjects[k].some((t) => t.name === topic)) ?? 'Mathe'
+  const packText =
+    pack.state === 'ok'
+      ? `Lerninhalte: ${pack.pkg.title}, ${pack.pkg.topics.reduce((n, t) => n + t.lessons.length, 0)} fertige Aufgaben, auf diesem Gerät gespeichert (auch ohne Internet).`
+      : pack.state === 'laden'
+        ? 'Lerninhalte werden geladen …'
+        : pack.state === 'fehlt'
+          ? `Für die ${child.grade}. Klasse gibt es noch kein fertiges Paket. Aufgaben erstellt die KI beim Antippen.`
+          : null
+  // Hilfen, die die Anzeige ändern
+  const easyFirst = child.helps.includes('leichteSprache')
+  const showVisual = child.helps.includes('zahlenBild')
   const [screen, setScreen] = useState<ScreenName>('home')
   const [mood, setMood] = useState(() => saved.mood[dayKey(new Date())]?.value ?? 50)
   const [moodTouched, setMoodTouched] = useState(false)
   const [subject, setSubject] = useState('Mathe')
   const [attemptId, setAttemptId] = useState<string | null>(null)
   const [stepIndex, setStepIndex] = useState(0)
-  // Pro Schritt gemerkt, damit Luisa zurückgehen kann und ihre Antworten sichtbar bleiben
+  // Pro Schritt gemerkt, damit das Kind zurückgehen kann und ihre Antworten sichtbar bleiben
   const [versions, setVersions] = useState<number[]>([])
   const [results, setResults] = useState<(CheckResult | null)[]>([])
   const [reward, setReward] = useState<string[]>([])
@@ -67,7 +97,8 @@ export default function App() {
   const abort = useRef<AbortController | null>(null)
 
   const lessons: Record<string, Lesson> = { [SAMPLE_LESSON.id]: SAMPLE_LESSON, ...saved.lessons }
-  const lesson = lessons[lessonId] ?? SAMPLE_LESSON
+  const rawLesson = lessons[lessonId] ?? SAMPLE_LESSON
+  const lesson = easyFirst ? withEasyFirst(rawLesson) : rawLesson
   const version = versions[stepIndex] ?? 0
   const result = results[stepIndex] ?? null
   const setVersion = (v: number) => setVersions((old) => Object.assign([...old], { [stepIndex]: v }))
@@ -75,7 +106,7 @@ export default function App() {
   const today = dayKey(new Date())
   const todayMood = saved.mood[today]
 
-  // Stimmung wird einmal pro Tag gespeichert, sobald Luisa nach dem Einstellen mit dem Lernen anfängt
+  // Stimmung wird einmal pro Tag gespeichert, sobald das Kind nach dem Einstellen mit dem Lernen anfängt
   const saveMoodIfNeeded = () => {
     if (!moodTouched || todayMood) return
     const at = new Date().toISOString()
@@ -109,7 +140,7 @@ export default function App() {
     setJob(j)
     setScreen('waiting')
     try {
-      const answer = j.ask.mode === 'page-file' ? await requestPage(await shrinkPhoto(j.ask.file), ctrl.signal) : await requestLesson(j.ask, ctrl.signal)
+      const answer = j.ask.mode === 'page-file' ? await requestPage(await shrinkPhoto(j.ask.file), learner, ctrl.signal) : await requestLesson(j.ask, learner, ctrl.signal)
       if (ctrl.signal.aborted) return
       if ('page' in answer) {
         const page: Page = { id: crypto.randomUUID(), at: new Date().toISOString(), ...answer.page }
@@ -171,8 +202,19 @@ export default function App() {
     setScreen(job?.back ?? 'home')
   }
 
-  const startTopic = (subj: string, topic: string, back: ScreenName, how: string) =>
-    run({ ask: { mode: 'topic', subject: subj, topic }, how, waitText: `Ich denke mir eine Aufgabe zu „${topic}“ aus.`, back })
+  const startTopic = (subj: string, topic: string, back: ScreenName, how: string) => {
+    const packed = pkg?.subject === subj ? pkg.topics.find((t) => t.name === topic) : undefined
+    const ready = packed && nextLesson(packed, saved)
+    if (ready) {
+      // Aufgabe aus dem Paket: sofort da, ohne KI. Sie wird zum Stand des Kindes gelegt, damit Verlauf und Wiederholen funktionieren.
+      setSaved((s) => withLesson(s, ready))
+      setLessonId(ready.id)
+      setPracticeKey(null)
+      startLesson(ready, `${how}, aus dem Paket ${pkg!.title}`)
+      return
+    }
+    return run({ ask: { mode: 'topic', subject: subj, topic }, how, waitText: `Ich denke mir eine Aufgabe zu „${topic}“ aus.`, back })
+  }
 
   const startLesson = (l: Lesson, how: string, photo = false) => {
     const id = crypto.randomUUID()
@@ -247,7 +289,7 @@ export default function App() {
     setScreen('done')
   }
 
-  // Offene Übungen: die zwei neuen Aufgaben jedes fertigen Lernpfads, die Luisa noch nicht gemacht hat
+  // Offene Übungen: die zwei neuen Aufgaben jedes fertigen Lernpfads, die das Kind noch nicht gemacht hat
   const current = saved.attempts.filter((a) => !a.archivedAt)
   const finishedLessons = [...new Set(current.filter((a) => a.finishedAt).map((a) => a.lessonId))]
     .map((id) => lessons[id])
@@ -268,6 +310,7 @@ export default function App() {
     case 'home':
       return (
         <Home
+          name={child.name}
           mood={mood}
           moodSavedAt={todayMood ? clock(todayMood.at) : null}
           moodEgg={!!todayMood?.egg}
@@ -304,7 +347,7 @@ export default function App() {
     case 'page':
       return page ? <PageScreen page={page} status={taskStatus(page)} onPick={(i) => startPageTask(page, i)} onBack={() => setScreen('home')} /> : null
     case 'step':
-      return <StepScreen lesson={lesson} index={stepIndex} version={version} results={results} onGoTo={onGoTo} onAgain={onAgain} onResult={onResult} onNext={onNext} onStop={onStop} />
+      return <StepScreen showVisual={showVisual} readAloud={child.helps.includes('vorlesen')} lesson={lesson} index={stepIndex} version={version} results={results} onGoTo={onGoTo} onAgain={onAgain} onResult={onResult} onNext={onNext} onStop={onStop} />
     case 'done':
       return (
         <Done
@@ -327,6 +370,7 @@ export default function App() {
     case 'practice':
       return (
         <PracticeMenu
+          subjects={subjects}
           selection={saved.selection}
           openCount={finishedLessons.reduce((n, l) => n + l.practice.length, 0)}
           photoCount={pages.length + photoAttempts.length}
@@ -341,6 +385,7 @@ export default function App() {
     case 'subject':
       return (
         <SubjectScreen
+          subjects={subjects}
           subject={subject}
           selection={saved.selection}
           practiced={practiced}
@@ -396,9 +441,21 @@ export default function App() {
     case 'farm':
       return <FarmScreen farm={saved.farm} onBack={() => setScreen('home')} />
     case 'pin':
-      return <PinGate pin={saved.parentPin} onSetPin={(p) => setSaved((s) => ({ ...s, parentPin: p }))} onOk={() => setScreen('family')} onBack={() => setScreen('home')} />
+      return (
+        <PinGate
+          pin={pin}
+          name={child.name}
+          onSetPin={(p) => setFamily((f) => ({ ...f, pin: p }))}
+          onOk={() => {
+            // Luisas bisherige PIN wird beim ersten Öffnen zur gemeinsamen PIN der Familie
+            if (!family.pin && pin) setFamily((f) => ({ ...f, pin }))
+            setScreen('family')
+          }}
+          onBack={() => setScreen('home')}
+        />
+      )
     case 'family':
-      return <Family saved={saved} cloud={cloud} lessons={lessons} onArchive={(ids) => setSaved((s) => archiveAttempts(s, ids))}
+      return <Family packText={packText} child={child} family={family} setFamily={setFamily} onAssignDevice={onAssignDevice} saved={saved} cloud={cloud} lessons={lessons} onArchive={(ids) => setSaved((s) => archiveAttempts(s, ids))}
           onRestore={(id) => setSaved((s) => restoreAttempt(s, id))} onBack={() => setScreen('home')} />
   }
 }
