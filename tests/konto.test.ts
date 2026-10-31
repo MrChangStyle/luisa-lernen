@@ -184,3 +184,28 @@ describe('Eltern-Konten und Kindergeräte', () => {
     expect((await ask(data.GET, api('/api/data?kind=luisa', both))).status).toBe(403)
   })
 })
+
+describe('Name der App', () => {
+  beforeEach(() => {
+    fake = fakeSupabase()
+    vi.stubEnv('SUPABASE_SECRET_KEY', 'test-geheim')
+    vi.stubEnv('SESSION_SECRET', 'sitzungs-schluessel')
+    vi.stubEnv('APP_PASSWORD', 'Hühnerstall-42')
+    vi.stubGlobal('fetch', vi.fn(async (u: string, i?: RequestInit) => fake.handle(u, i)))
+  })
+  afterEach(() => {
+    vi.unstubAllEnvs()
+    vi.unstubAllGlobals()
+  })
+  const nameFor = async (cookie: string) => (await (await middleware(new Request(`${BASE}/manifest.webmanifest`, { headers: { cookie } }))).json()).name
+
+  it('heißt auf dem Gerät eines Kindes wie das Kind, sonst wie die App', async () => {
+    expect(await nameFor('')).toBe('Lernhof')
+    const c = await newFamily('mama@example.de', 'Familie Test')
+    expect(await nameFor(c)).toBe('Lernhof')
+    await putFamily(c, [{ ...ben, name: 'Caroline' }])
+    const { cookie: dev } = await pair(c, 'ben-a1b2c3')
+    expect(await nameFor(dev)).toBe('Caroline lernen')
+    expect(await nameFor(`luisa_zugang=${await legacyToken('Hühnerstall-42')}`)).toBe('Luisa lernen')
+  })
+})

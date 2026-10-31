@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import App from './App'
 import { useMe, type Me } from './logic/konto'
+import { BASE_NAME, childAppName } from './logic/name'
 import type { Child } from './logic/learner'
 import { Parents } from './screens/Parents'
 import { useFamily } from './state'
@@ -9,8 +10,19 @@ import { useFamily } from './state'
 // Kindergerät: nur dieses eine Kind, kein Wechsel, keine Kinderliste.
 // Eltern-Konto: Elternbereich mit Kindern, Geräten und Übersicht je Kind.
 // Bisheriges Familien-Passwort: alles wie bisher (Luisa).
+// Titel im Browser und Name beim Ablegen auf dem Startbildschirm (iPhone/iPad lesen ihn aus der Seite)
+// null: setzt eine Unterkomponente (Kindergerät, bisheriger Zugang)
+function useAppName(name: string | null) {
+  useEffect(() => {
+    if (!name) return
+    document.title = name
+    document.querySelector('meta[name="apple-mobile-web-app-title"]')?.setAttribute('content', name)
+  }, [name])
+}
+
 export default function Root() {
   const [me, reload] = useMe()
+  useAppName(me?.rolle === 'eltern' ? `${BASE_NAME} · Eltern` : null)
   if (!me) return null
   if (me.rolle === 'kind') return <ChildDevice key={me.kind.id} me={me} />
   if (me.rolle === 'eltern') return <Parents key={me.familie?.id ?? 'neu'} me={me} reload={reload} />
@@ -22,6 +34,7 @@ function ChildDevice({ me }: { me: Extract<Me, { rolle: 'kind' }> }) {
   const [family] = useFamily({ key: 'luisa-lernen:kinder:geraet', start: { children: [me.kind], pin: null }, readOnly: true })
   // Name, Klasse und Hilfen immer in der neuesten Fassung vom Server
   const child: Child = family.children.find((c) => c.id === me.kind.id) ?? me.kind
+  useAppName(childAppName(child.name))
   return <App key={child.id} device="kind" child={child} family={{ children: [child], pin: family.pin }} setFamily={() => {}} />
 }
 
@@ -40,6 +53,7 @@ function LegacyRoot() {
   const [family, setFamily] = useFamily()
   const [active, setActive] = useState(loadActive)
   const child = family.children.find((c) => c.id === active) ?? family.children[0]
+  useAppName(childAppName(child.name))
   // Nur im Familienbereich (hinter der Eltern-PIN): dieses Gerät einem anderen Kind zuordnen
   const assignDevice = (id: string) => {
     try {

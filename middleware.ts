@@ -1,5 +1,8 @@
 import { next } from '@vercel/functions'
 import { DbError, db, sendEmailCode, verifyEmailCode } from './server/db.js'
+import { who } from './server/auth.js'
+import { BASE_NAME, childAppName, manifest } from './src/logic/name.js'
+import { LUISA } from './src/logic/learner.js'
 import {
   DEVICE_COOKIE,
   DEVICE_DAYS,
@@ -37,7 +40,7 @@ const shell = (body: string, status: number, extra: Record<string, string> = {})
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
-<title>Luisa lernt</title>
+<title>${BASE_NAME}</title>
 <style>
   body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #f7f5ef; color: #1f2a2e;
     font: 17px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
@@ -70,7 +73,7 @@ function startPage(message = '', status = 401) {
   </form></details>`
     : ''
   return shell(
-    `<h1>Luisa lernt</h1>
+    `<h1>${BASE_NAME}</h1>
 ${msg(message)}
 <form method="post" action="/__geraet">
   <h2>Für Kinder: Gerät einrichten</h2>
@@ -178,9 +181,21 @@ async function legacyLogin(request: Request) {
   return startPage('Das Passwort passt nicht. Bitte versuche es noch einmal.')
 }
 
+async function appManifest(request: Request) {
+  let name = BASE_NAME
+  try {
+    const w = await who(request)
+    if (w?.r === 'kind') name = childAppName(w.child.name)
+    else if (w?.r === 'alt') name = childAppName(LUISA.name)
+  } catch {
+    // Datenbank nicht erreichbar: Basisname
+  }
+  return new Response(JSON.stringify(manifest(name)), { headers: { 'content-type': 'application/manifest+json', 'cache-control': 'no-store' } })
+}
+
 export default async function middleware(request: Request) {
   if (!process.env.APP_PASSWORD && !sessionKey()) {
-    return shell('<h1>Luisa lernt</h1><p>Der Zugang ist noch nicht eingerichtet. Ein Elternteil muss APP_PASSWORD oder SUPABASE_SECRET_KEY in Vercel eintragen.</p>', 503)
+    return shell(`<h1>${BASE_NAME}</h1><p>Der Zugang ist noch nicht eingerichtet. Ein Elternteil muss APP_PASSWORD oder SUPABASE_SECRET_KEY in Vercel eintragen.</p>`, 503)
   }
   const url = new URL(request.url)
   const post = request.method === 'POST'
@@ -197,6 +212,9 @@ export default async function middleware(request: Request) {
     // Nur Eltern melden sich ab. Ein Kindergerät wird im Elternbereich entfernt.
     return redirectHome(clearCookie(PARENT_COOKIE))
   }
+
+  // Name auf dem Startbildschirm: auf dem Gerät eines Kindes „<Name> lernen“, sonst der Basisname
+  if (url.pathname === '/manifest.webmanifest') return appManifest(request)
 
   if (await sessionOf(request)) return next()
   if (url.pathname.startsWith('/api/')) return Response.json({ error: 'Bitte melde dich zuerst an. Lade die Seite neu.' }, { status: 401 })
